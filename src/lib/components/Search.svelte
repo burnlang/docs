@@ -167,7 +167,7 @@
                   choose(r);
                 }}
               >
-                <span class="where">{r.section} › {r.title}</span>
+                <span class="where">{r.title} <span class="sec">{r.section}</span></span>
                 <span class="detail">{@html r.detail}</span>
               </a>
             </li>
@@ -185,22 +185,22 @@
     position: fixed;
     inset: 0;
     z-index: 50;
-    background: rgb(20 12 6 / 0.45);
+    background: rgb(20 16 12 / 0.4);
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 10vh 16px 16px;
+    padding: 12vh 16px 16px;
   }
 
   .dialog {
-    width: min(640px, 100%);
-    max-height: 75vh;
+    width: min(620px, 100%);
+    max-height: 72vh;
     display: flex;
     flex-direction: column;
     background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    box-shadow: var(--shadow);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    box-shadow: 0 30px 60px -30px rgb(0 0 0 / 0.45);
     overflow: hidden;
   }
 
@@ -208,9 +208,9 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.8rem 1rem;
-    border-bottom: 1px solid var(--border);
-    color: var(--fg-soft);
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    color: var(--faint);
   }
 
   input {
@@ -218,7 +218,7 @@
     border: 0;
     outline: 0;
     background: transparent;
-    color: var(--fg);
+    color: var(--ink);
     font: inherit;
     font-size: 1.05rem;
   }
@@ -227,44 +227,43 @@
     display: none;
   }
 
-  kbd {
-    font-size: 0.72rem;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 0.05rem 0.35rem;
-  }
-
   ul {
     list-style: none;
     margin: 0;
-    padding: 0.4rem;
+    padding: 0.35rem 0;
     overflow-y: auto;
   }
 
   li a {
     display: block;
-    padding: 0.55rem 0.75rem;
-    border-radius: 8px;
-    color: var(--fg);
+    padding: 0.6rem 1rem 0.6rem calc(1rem - 2px);
+    border-left: 2px solid transparent;
+    color: var(--ink);
     text-decoration: none;
   }
 
   li a.active {
-    background: var(--accent-soft);
+    background: var(--surface);
+    border-left-color: var(--accent);
   }
 
   .where {
     display: block;
-    font-weight: 600;
-    font-size: 0.92rem;
+    font-weight: 500;
+    font-size: 0.93rem;
+  }
+
+  .sec {
+    margin-left: 0.4rem;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--faint);
   }
 
   .detail {
-    display: block;
-    color: var(--fg-soft);
-    font-size: 0.85rem;
+    color: var(--muted);
+    font-size: 0.84rem;
     overflow: hidden;
-    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -274,6 +273,7 @@
   .empty {
     margin: 0;
     padding: 1.2rem 1rem;
-    color: var(--fg-soft);
+    color: var(--faint);
+    font-size: 0.92rem;
   }
 </style>
