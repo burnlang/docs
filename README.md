@@ -3,6 +3,8 @@
 The documentation of the [Burn programming language](https://github.com/burnlang/burn): the language, the standard
 library, the toolchain, how Burn works in the background, and the Burn Virtual Machine.
 
+Read it at **https://burnlang.github.io/docs/**.
+
 ## Layout
 
 ```text
@@ -39,6 +41,28 @@ file, like `[enums](../language/enums.mdx#variants-with-data)`, so they work on 
 - Keep lines at most 120 characters, except in tables.
 - Diagrams are hand-written SVG in `content/images/`, in the colors of the Burn logo, on a light card so they also
   read on dark backgrounds.
+
+## The website
+
+The site is a [SvelteKit](https://svelte.dev/docs/kit) app in `src/` that turns `content/` into static pages:
+
+- every page is prerendered, so the result in `build/` is plain HTML that any static host serves;
+- Burn code is highlighted with the TextMate grammar of the VS Code extension (`src/lib/server/burn.tmLanguage.json`),
+  bvm assembly with a small grammar of its own;
+- links between pages and to headings are checked while building: a broken link or a missing `#anchor` fails the
+  build;
+- search runs in the browser over `search.json`, built from the pages (press `/` or Ctrl+K).
+
+```sh
+npm install
+npm run dev        # http://localhost:5173, reloads when content/ changes
+npm run check      # type-check the site
+npm run build      # write the static site to build/
+npm run preview    # serve build/
+```
+
+Set `BASE_PATH` when the site is served from a subpath: `BASE_PATH=/docs npm run build` for GitHub Pages. Pushes to
+`master` deploy it there.
 
 ## License
 
