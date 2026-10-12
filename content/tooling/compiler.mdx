@@ -77,8 +77,10 @@ runtime core built without `std`), and the checker rejects the features it leave
 
 ## Bootstrapping
 
-The compiler builds itself. A released Burn (stage0, named in `compiler/STAGE0`) compiles `compiler/src` once; that
-compiler builds itself again, and both results must be the same module (`scripts/bootstrap.sh`). Releases up to
+The compiler builds itself. bvm runs the boot compiler kept in the repository (`compiler/boot/compiler.bvmc`, a
+compiled copy of the compiler), which compiles `compiler/src` once; that compiler builds itself again, and both
+results must be the same module (`scripts/bootstrap.sh`). Building needs only Rust, for bvm; until
+`26.1.0-experimental-4` a released Burn (stage0) started the bootstrap instead. Releases up to
 `26.1.0-experimental-2` were compiled by a compiler written in Rust; it was retired once the compiler written in Burn
 did everything it did. `26.1.0-experimental-3` shipped without the native and JavaScript backends, and
 `26.1.0-experimental-4` brings both back, ported to Burn.
