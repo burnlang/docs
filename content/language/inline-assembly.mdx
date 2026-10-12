@@ -254,3 +254,39 @@ gives each one a slot, and checks `bvm` code. The [IR](../internals/front-end.md
 the statements that copy operands in and out, and the `else` code, and each code generator picks the section for its
 own target. That is why the `else` code, and the operands, behave exactly like the rest of the function, including
 [smart casts](./smart-casts.mdx), closures and [memory management](./memory.mdx).
+
+The compiler uses inline assembly itself. Turning a float constant into its bits for bvm or native code is a single
+copy in assembly, so `floatToBits` and `floatFromBits` in `compiler/src/vm/bits.bn` have `bvm`, `x86_64` and `arm64`
+sections, with the arithmetic version as the `else` fallback:
+
+```burn
+pub fun floatToBits(f: float): int {
+    if (isNan(f)) {
+        return CANONICAL_NAN
+    }
+    var bits = 0
+    unsafe {
+        asm {
+            bvm {
+                load {f}
+                store {bits}
+            }
+            x86_64 {
+                mov rax, {f}
+                mov {bits}, rax
+            }
+            arm64 {
+                ldr x9, {f}
+                str x9, {bits}
+            }
+            else {
+                bits = portableToBits(f)
+            }
+        }
+    }
+    return bits
+}
+```
+
+This works because bvm keeps every value as 64 bits and checks only the height of its stack, not what a slot
+holds: storing a float in an `int` slot keeps its bits as they are.
