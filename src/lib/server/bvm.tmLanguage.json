@@ -1,0 +1,22 @@
+{
+  "name": "bvm",
+  "scopeName": "source.bvm",
+  "patterns": [
+    { "name": "comment.line.semicolon.bvm", "match": ";.*$" },
+    {
+      "name": "string.quoted.double.bvm",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.bvm", "match": "\\\\." }]
+    },
+    { "name": "storage.type.annotation.bvm", "match": "@[A-Za-z_][A-Za-z0-9_]*" },
+    {
+      "name": "keyword.control.directive.bvm",
+      "match": "^\\s*(module|import|export|type|func|end|global|string|loc|entry|table|extern|local|locals)\\b"
+    },
+    { "name": "storage.type.bvm", "match": "\\b(int|float|bool|string|void|any|record|struct|interface|implements|int8|uint8|int16|uint16|int32|uint32|uint64|float32)\\b" },
+    { "name": "constant.numeric.bvm", "match": "(?<![\\w.])-?(0x[0-9a-fA-F]+|[0-9]+(\\.[0-9]+)?)\\b" },
+    { "name": "entity.name.label.bvm", "match": "^\\s*[A-Za-z_][A-Za-z0-9_]*:" },
+    { "name": "keyword.other.instruction.bvm", "match": "^\\s*[a-z][a-z0-9_]*\\b" }
+  ]
+}
