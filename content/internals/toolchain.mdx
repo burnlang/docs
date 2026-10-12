@@ -99,16 +99,24 @@ prints the accumulated code.
 
 ## How the compiler builds itself
 
-The compiler is a Burn program, so it needs a Burn compiler to build. `compiler/STAGE0` names a released toolchain,
-stage0. Building Burn (`scripts/package.sh`, or `scripts/bootstrap.sh`) then:
+The compiler is a Burn program, so it needs a Burn compiler to build. That compiler is in the repository:
+`compiler/boot/compiler.bvmc` is the compiler from an earlier commit, compiled to bvm bytecode, the way Zig keeps
+`zig1.wasm`. Only Rust is needed to start. Building Burn (`scripts/package.sh`, or `scripts/bootstrap.sh`) builds bvm
+with cargo and then:
 
-![stage0 builds stage 1, stage 1 builds stage 2, and both must be identical](../images/bootstrap.svg)
+![the boot compiler builds stage 1, stage 1 builds stage 2, and both must be identical](../images/bootstrap.svg)
 
-1. compiles `compiler/src` with stage0, giving stage 1;
+1. lets bvm run the boot compiler, which compiles `compiler/src`, giving stage 1;
 2. compiles `compiler/src` again with stage 1, giving stage 2;
-3. checks that stage 1 and stage 2 are the same module, byte for byte.
+3. checks that stage 1 and stage 2 are the same module, byte for byte. When they are not, because the code generator
+   changed since the boot compiler was made, stage 2 compiles `compiler/src` once more, and stage 2 and stage 3 must
+   be the same.
 
 The last step proves that the compiler, compiled by itself, produces exactly what it was compiled from, so a release
 does not depend on quirks of the compiler that built it. The command line, the formatter and the runtime library are
-then compiled with the new compiler, and the result is packaged. CI runs this on every change, starting both from the
-named stage0 and from the compiler just built.
+then compiled with the new compiler, and the result is packaged. CI runs this on every change.
+
+`compiler/src` may only use language features that the boot compiler understands. To use a new one in the compiler,
+the feature lands first; then `sh scripts/bootstrap.sh --update` replaces the boot compiler with the compiler just
+built, and the first use comes with it. Until `26.1.0-experimental-4`, a released Burn (stage0) started the bootstrap
+instead, which meant cutting a release before the compiler could use anything new.
