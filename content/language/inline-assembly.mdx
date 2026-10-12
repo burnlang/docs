@@ -1,0 +1,256 @@
+---
+title: Inline assembly
+description: asm blocks with code for x86-64, arm64, bvm and JavaScript, operands, fallbacks, and the rules each target sets.
+order: 22
+---
+
+# Inline assembly
+
+An `asm` block puts code for the machine straight into a Burn function. Burn builds for several targets, so one block
+holds a section for each target it supports, and the compiler picks the section for the target it builds:
+
+```burn
+fun add(a: int, b: int): int {
+    var r = 0
+    unsafe {
+        asm {
+            x86_64 {
+                mov rax, {a}
+                add rax, {b}
+                mov {r}, rax
+            }
+            arm64 {
+                ldr x9, {a}
+                ldr x10, {b}
+                add x9, x9, x10
+                str x9, {r}
+            }
+            bvm {
+                load {a}
+                load {b}
+                iadd
+                store {r}
+            }
+            js {
+                {r} = {a} + {b};
+            }
+        }
+    }
+    return r
+}
+
+print(add(2, 40))  // 42 on every target
+```
+
+Assembly is [unsafe code](./unsafe.mdx): an `asm` block must be in an `unsafe` block or an `unsafe fun`.
+
+## Sections
+
+| Section | Used by | Written in |
+| --- | --- | --- |
+| `x86_64` | native executables for x86-64 (Linux and macOS) | x86-64 assembly in Intel syntax, as the GNU assembler and clang read it |
+| `arm64` (or `aarch64`) | native executables for 64-bit ARM (Apple silicon, Linux on arm64) | AArch64 assembly |
+| `bvm` | `burn app.bn`, `burni`, `burn run`, the REPL, and `bvm` and `bar` builds | [bvm instructions](#bvm) |
+| `js` | `burn build --target js` | JavaScript statements |
+| `else` | every target that has no section of its own | Burn |
+
+The sections can come in any order, except that `else` comes last, and each target can appear once. The code of a
+section is everything between its braces, so the braces inside it must balance, comments included.
+
+Which native section is used depends on the machine the executable is built for: the one `burn build` runs on, or
+the one `BURN_PLATFORM` names when [cross-compiling](../tooling/cross-compiling.mdx).
+
+### The `else` section
+
+`else` holds ordinary Burn code for every target without a section. It is checked like any other code, so it is the
+natural place for a portable version of what the assembly does, and a good reference to test the assembly against:
+
+```burn
+fun popcount(x: int): int {
+    var n = 0
+    unsafe {
+        asm {
+            x86_64 {
+                popcnt rax, {x}
+                mov {n}, rax
+            }
+            else {
+                var v = x
+                while (v != 0) {
+                    v = v & (v - 1)
+                    n += 1
+                }
+            }
+        }
+    }
+    return n
+}
+```
+
+### Missing sections
+
+Without an `else`, a block only works on the targets it has sections for:
+
+- A native or JavaScript build stops with an error that names the block:
+
+  ```text
+  the `asm` block at app.bn:4:9 has no `js` section and no `else` section, so it cannot be built for js
+  ```
+
+- On bvm the program still runs, and reaching the block is a runtime error. That lets one program use native-only
+  assembly behind a check, and still run with `burn app.bn` while you work on it.
+
+## Operands
+
+`{name}` in the code of a section stands for the variable `name`. It can be a local variable, a parameter, a global
+variable or a variable that a closure captures, and it must be an `int`, a `uint64` or a `float`:
+
+```text
+error: `s` has type string, but an asm operand must be an `int`, `uint64` or `float`
+```
+
+Each operand is copied into a slot of its own before the code runs, and copied back into the variable after it, so
+the code can read and change it in place. A constant is copied in but not back: changing it in the assembly has no
+effect. Using the same name twice gives the same slot.
+
+What `{name}` turns into depends on the target:
+
+| Target | `{x}` becomes | For example |
+| --- | --- | --- |
+| `x86_64` | a memory operand for the slot | `mov rax, {x}` → `mov rax, qword ptr [rbp - 24]` |
+| `arm64` | an address for the slot | `ldr x9, {x}` → `ldr x9, [x29, #16]` |
+| `bvm` | the number of the slot, for `load`, `store` and `tee` | `load {x}` → `load 3` |
+| `js` | the name of the JavaScript variable | `{x} += 1;` → `l3 += 1;` |
+
+Values are stored as 64 bits: an `int` in two's complement, a `uint64` as an unsigned number, and a `float` as an
+IEEE 754 double. In JavaScript, all three are numbers.
+
+Only a name directly between braces is an operand. Anything else in braces is left alone, so in JavaScript write a
+block that holds a single name with spaces, `{ x }`.
+
+## Rules for native code
+
+The code of an `x86_64` or `arm64` section is copied into the function's assembly line by line, without being
+checked. It has to fit into the code around it:
+
+- **Registers.** Treat the block like the body of a C function. Caller-saved registers are free to use. Callee-saved
+  registers must hold their old values when the block ends.
+
+  | | Free to use | Restore before the end | Never change |
+  | --- | --- | --- | --- |
+  | x86-64 | `rax`, `rcx`, `rdx`, `rsi`, `rdi`, `r8`–`r11`, `xmm0`–`xmm15` | `rbx`, `r12`–`r15` | `rsp`, `rbp` |
+  | arm64 | `x0`–`x17`, `v0`–`v7`, `v16`–`v31` | `x19`–`x28`, `d8`–`d15` | `sp`, `x29`, `x18` |
+
+- **The stack.** Leave `rsp` (or `sp`) where it was. Pushing and popping inside the block is fine as long as it
+  balances. Burn's frame pointer (`rbp` or `x29`) addresses the operands, so it must not move.
+- **Labels.** The compiler may emit a function more than once (a [generic](./generics.mdx) function, once per type),
+  so named labels can clash. Use numeric local labels: `1:` defines one, `1b` jumps back to the closest `1:` before,
+  and `1f` forward to the closest after.
+- **Calls.** Calling other code from assembly is possible but rarely a good idea: you must align the stack (to 16
+  bytes on both targets) and save what the callee may change. Call a Burn function from Burn instead, before or after
+  the block.
+- **Syntax.** x86-64 code uses Intel syntax without `%` prefixes (`mov rax, qword ptr [rbx + 8]`), since the file is
+  assembled with `.intel_syntax noprefix`.
+
+Mistakes in the assembly itself, like a wrong mnemonic, show up as errors from the system assembler when the
+executable is linked. `burn dump --asm app.bn` prints the whole assembly of the program with your code in place.
+
+## bvm
+
+A `bvm` section holds bvm instructions, one per line. They work on bvm's operand stack: instructions take their
+inputs from the top of the stack and push their result. `;` starts a comment, and a line `name:` is a label.
+
+```burn
+fun popcount(x: int): int {
+    var n = 0
+    unsafe {
+        asm {
+            bvm {
+            top:
+                load {x}
+                const 0
+                ieq
+                jnz done        ; stop when x == 0
+                load {x}
+                load {x}
+                const 1
+                isub
+                and
+                store {x}       ; x = x & (x - 1)
+                load {n}
+                const 1
+                iadd
+                store {n}       ; n += 1
+                jmp top
+            done:
+            }
+            else {
+                var v = x
+                while (v != 0) {
+                    v = v & (v - 1)
+                    n += 1
+                }
+            }
+        }
+    }
+    return n
+}
+```
+
+These are the instructions a section can use:
+
+| Instructions | Stack | What they do |
+| --- | --- | --- |
+| `const n` | → value | push a whole number written in decimal |
+| `load {x}` | → value | push an operand |
+| `store {x}` | value → | pop the top value into an operand |
+| `tee {x}` | value → value | copy the top value into an operand and keep it |
+| `pop` | value → | drop the top value |
+| `iadd` `isub` `imul` | a b → r | integer arithmetic that wraps around |
+| `iadd.ovf` `isub.ovf` `imul.ovf` | a b → r | integer arithmetic that stops the program on overflow |
+| `idiv` `irem` | a b → r | division and remainder, which stop the program when b is 0 |
+| `ineg.ovf` | a → r | negation that stops the program on overflow |
+| `and` `or` `xor` `shl` `shr` `ushr` | a b → r | bitwise operations and shifts |
+| `fadd` `fsub` `fmul` `fdiv` | a b → r | float arithmetic |
+| `fneg` | a → r | float negation |
+| `i2f` `f2i` | a → r | convert between `int` and `float` |
+| `ieq` `ine` `ilt` `ile` `igt` `ige` | a b → bool | compare ints (`u…` for `uint64`, `f…` for floats) |
+| `not` | bool → bool | logical not |
+| `jmp label` | | jump |
+| `jz label` `jnz label` | value → | jump when the value is zero or false (`jz`), or not (`jnz`) |
+
+Unlike native code, the compiler checks a `bvm` section before it builds anything. Unknown instructions, missing
+arguments, labels that do not exist and slot numbers written by hand are errors, and so is code that leaves the stack
+unbalanced:
+
+```text
+error: `iadd` needs 2 values on the stack, but there are only 1
+ --> app.bn:7:17
+  |
+7 |                 iadd
+  |                 ^^^^
+```
+
+The stack has to hold the same number of values on every path to a label, and the section has to end with the stack
+as it found it. Runtime errors from `idiv`, `irem` and the `.ovf` instructions point at the `bvm` section.
+`burn dump --bvm app.bn` prints the bytecode the section became.
+
+## JavaScript
+
+A `js` section holds JavaScript statements that are copied into the generated function, with each operand replaced
+by the name of its variable. Write statements, not a function body: a `return` would leave the Burn function without
+its result. `burn dump --js app.bn` shows the generated JavaScript.
+
+## Formatting
+
+`burn fmt` and `burnfmt` do not change the code of `x86_64`, `arm64`, `bvm` and `js` sections. They only move a
+section as a whole to the indentation of its block, and keep the indentation of its lines relative to each other, so
+labels written further left stay further left. The `else` section is Burn and is formatted like the rest.
+
+## Under the hood
+
+The parser reads each section, other than `else`, as one piece of raw text. The type checker resolves the operands,
+gives each one a slot, and checks `bvm` code. The [IR](../internals/front-end.mdx) keeps the code of every section,
+the statements that copy operands in and out, and the `else` code, and each code generator picks the section for its
+own target. That is why the `else` code, and the operands, behave exactly like the rest of the function, including
+[smart casts](./smart-casts.mdx), closures and [memory management](./memory.mdx).

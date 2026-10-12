@@ -75,11 +75,11 @@
       "patterns": [
         {
           "name": "keyword.control.burn",
-          "match": "\\b(if|else|while|for|in|match|return|break|continue|await|import)\\b"
+          "match": "\\b(if|else|while|for|in|match|return|break|continue|await|import|asm)\\b"
         },
         {
           "name": "keyword.declaration.burn",
-          "match": "\\b(fun|var|const|def|async|static|abstract|pub|priv)\\b"
+          "match": "\\b(fun|var|const|def|async|static|abstract|pub|priv|unsafe)\\b"
         },
         { "name": "keyword.operator.word.burn", "match": "\\b(is|as)\\b" },
         { "name": "constant.language.burn", "match": "\\b(true|false|null)\\b" },
