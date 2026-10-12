@@ -18,7 +18,7 @@ const SECTIONS: Record<string, string> = {
 };
 
 const BLURBS: Record<string, string> = {
-  language: 'The language itself: variables and types, functions and closures, match, structs and enums, generics, null safety, modules and async.',
+  language: 'The language itself: variables and types, functions and closures, match, structs and enums, generics, null safety, modules, async and inline assembly.',
   stdlib: 'What ships with Burn: the built-in functions and the modules for math, strings, files, processes, JSON, HTTP and time.',
   tooling: 'Working with Burn: the command line, projects and packages, tests, the REPL, the formatter, editors and native builds.',
   internals: 'What happens in the background, from the parser and type checker to values in memory, reference counting and bvm.',

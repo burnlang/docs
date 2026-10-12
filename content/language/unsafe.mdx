@@ -1,0 +1,123 @@
+---
+title: Unsafe code
+description: unsafe blocks and unsafe functions, what needs them, and what the compiler stops checking inside them.
+order: 21
+---
+
+# Unsafe code
+
+Burn checks a program before it runs: types, initialization, overflow, array bounds and memory are all taken care of.
+A few things are out of the compiler's reach, because they work below the language. The main one is
+[inline assembly](./inline-assembly.mdx). Code like that goes in an `unsafe` block, which marks the spot where you,
+not the compiler, are responsible for getting it right.
+
+```burn
+fun add(a: int, b: int): int {
+    var r = 0
+    unsafe {
+        asm {
+            x86_64 {
+                mov rax, {a}
+                add rax, {b}
+                mov {r}, rax
+            }
+            else {
+                r = a + b
+            }
+        }
+    }
+    return r
+}
+```
+
+`unsafe` turns no checks off. Everything inside the block is checked like any other Burn code. It only allows the
+operations that need it.
+
+## What needs `unsafe`
+
+| Operation | Why |
+| --- | --- |
+| an [`asm` block](./inline-assembly.mdx) | the compiler cannot see what the assembly does to memory, registers or the stack |
+| calling an `unsafe fun` | the function relies on its caller to hold up rules the compiler cannot check |
+| using an `unsafe fun` as a value | a function value can be called anywhere, so taking it counts as calling it |
+
+Anywhere else, these are compile errors:
+
+```text
+error: inline assembly needs an `unsafe` block
+ --> app.bn:3:5
+  |
+3 |     asm {
+  |     ^^^
+  = help: wrap it in `unsafe { ... }`, or mark the function `unsafe fun`
+```
+
+## `unsafe` blocks
+
+`unsafe { ... }` is a statement. It works anywhere a statement does: in functions, methods, lambdas and top-level code.
+Like any other block it has its own scope, so variables declared inside it end with it:
+
+```burn
+var total = 0
+unsafe {
+    var doubled = twiceRaw(21)
+    total = doubled
+}
+print(total)
+```
+
+A lambda written inside an `unsafe` block is unsafe code too, so it can use unsafe operations without a block of its own.
+
+A block that has nothing unsafe in it gets a warning, since it only hides where the unsafe code really is:
+
+```text
+warning: this `unsafe` block has nothing in it that needs `unsafe`
+```
+
+## `unsafe` functions
+
+`unsafe fun` makes the whole body unsafe code, and makes the function itself unsafe to call:
+
+```burn
+/** Doubles a number in assembly. The caller makes sure it does not overflow. */
+unsafe fun twiceRaw(n: int): int {
+    var r = n
+    asm {
+        x86_64 {
+            shl {r}, 1
+        }
+        else {
+            r = r * 2
+        }
+    }
+    return r
+}
+
+unsafe {
+    print(twiceRaw(21))
+}
+```
+
+```text
+error: `twiceRaw` is an unsafe function, so calling it needs an `unsafe` block
+```
+
+Methods can be unsafe too: `unsafe fun` and `static unsafe fun` in a struct, with `pub` or `priv` in front as usual.
+
+Make a function `unsafe` when calling it wrong can break the program, for example when it trusts its arguments to be in
+a range. If the function checks everything itself, keep the `unsafe` block inside it and leave the function safe to
+call. That is the usual shape: a small unsafe core, wrapped in a safe function with a clear contract, documented with
+a [doc comment](../tooling/burndoc.mdx).
+
+## What you take on
+
+Inside an `unsafe` block the compiler still checks the Burn code, but it trusts that the unsafe operations:
+
+- leave the program's memory, stack and registers the way the generated code expects them (see the rules for each
+  target on the [inline assembly](./inline-assembly.mdx#rules-for-native-code) page);
+- only change the variables they name as operands;
+- work the same on every target you build for, or have a fallback.
+
+When one of these does not hold, the result is undefined: the program may crash, print wrong results, or fail
+somewhere far from the cause. Keep unsafe blocks small, test them on every target, and compare with the `else`
+fallback when you can.

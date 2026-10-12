@@ -1,7 +1,7 @@
 ---
 title: Native executables
 description: What burn build generates: the machine code, calling convention, startup, runtime library and linking of a native executable.
-order: 50
+order: 52
 ---
 
 # Native executables
@@ -105,6 +105,14 @@ The runtime, written in Rust, sometimes has to call a Burn function: to start an
 library calls back into the program. Burn functions take their arguments on the stack, which a Rust function cannot
 set up, so every executable contains a short hand-written function, `burn_call_trampoline(f, args, n)`, that pushes
 the `n` arguments and calls `f`. The runtime calls Burn code only through it.
+
+## Inline assembly
+
+An [`asm` block](../language/inline-assembly.mdx) has its `x86_64` or `arm64` code copied into the function as
+written. Before it, the code generator stores every operand in a slot of the frame, and `{x}` becomes that slot's
+address (`qword ptr [rbp - 24]` or `[x29, #16]`); after it, the slots are copied back into the variables. Nothing in
+the generated code keeps a value in a register from one statement to the next, which is why the block may use the
+caller-saved registers freely.
 
 ## Linking
 
