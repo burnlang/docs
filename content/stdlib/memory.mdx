@@ -1,0 +1,142 @@
+---
+title: std/memory
+description: Raw memory for unsafe code - allocating blocks of bytes, reading and writing numbers at addresses, copying and filling.
+order: 33
+---
+
+# `std/memory`
+
+`std/memory` gives [unsafe code](../language/unsafe.mdx) blocks of raw bytes outside Burn's own values. An address is
+a plain `int`, and every function is an `unsafe fun`:
+
+```burn
+import "std/memory"
+
+unsafe {
+    var p = Memory.alloc(16)
+    Memory.store64(p, 42)
+    Memory.store8(p + 8, 255)
+    print(Memory.load64(p), Memory.load8(p + 8))  // 42 255
+    Memory.free(p)
+}
+```
+
+Use it for data that has a fixed binary layout: building or reading a file format, packing numbers tightly,
+sharing a buffer with [inline assembly](../language/inline-assembly.mdx), or a data structure that manages its own
+memory. For everything else, Burn's arrays, maps and structs are faster to write and can't be misused.
+
+## Blocks
+
+| Function | What it does |
+| --- | --- |
+| `Memory.alloc(size)` | reserves `size` bytes, all zero, aligned to 16 bytes; the address, or `0` if it cannot |
+| `Memory.resize(address, size)` | makes a block larger or smaller, keeping its bytes (new ones are zero); the new address, or `0` if it cannot, in which case the old block stays valid |
+| `Memory.free(address)` | gives a block back; freeing `0` does nothing |
+
+A block lives until it is freed: it is not reference counted, and the [cycle collector](../internals/memory.mdx) does
+not know about it. A block that is never freed stays reserved until the program ends. After `resize`, use only the
+returned address, because the block may have moved.
+
+## Reading and writing
+
+| Function | What it does |
+| --- | --- |
+| `Memory.load8(address)`, `load16`, `load32` | read an unsigned number of 8, 16 or 32 bits (`load8` gives 0 to 255) |
+| `Memory.load64(address)` | read 64 bits as an `int` |
+| `Memory.loadFloat(address)` | read a 64-bit float |
+| `Memory.store8(address, value)`, `store16`, `store32` | write the lowest 8, 16 or 32 bits of `value` |
+| `Memory.store64(address, value)` | write an `int` as 64 bits |
+| `Memory.storeFloat(address, value)` | write a 64-bit float |
+
+Numbers are little-endian, as on every machine Burn runs on, and addresses need no alignment. A signed value comes
+back unsigned from the smaller loads, so sign-extend it yourself when you need to:
+
+```burn
+import "std/memory"
+
+/** Reads a signed 16-bit number. */
+unsafe fun loadI16(address: int): int {
+    var v = Memory.load16(address)
+    if (v >= 32768) {
+        return v - 65536
+    }
+    return v
+}
+```
+
+## Ranges of bytes
+
+| Function | What it does |
+| --- | --- |
+| `Memory.copy(to, from, size)` | copies `size` bytes; the two ranges may overlap |
+| `Memory.fill(address, byte, size)` | sets `size` bytes to the lowest 8 bits of `byte` |
+
+Both do nothing when `size` is 0 or less.
+
+## An example: a growable buffer
+
+A safe struct can keep raw memory private and check every access, so the code that uses it needs no `unsafe` at
+all:
+
+```burn
+import "std/math"
+import "std/memory"
+import "std/process"
+
+/** A list of 32-bit numbers in one block of memory. */
+def struct Ints32() {
+    int data = 0
+    int count = 0
+    int capacity = 0
+
+    fun push(v: int) {
+        unsafe {
+            if (count == capacity) {
+                capacity = max(8, capacity * 2)
+                data = Memory.resize(data, 4 * capacity)
+            }
+            Memory.store32(data + 4 * count, v)
+        }
+        count += 1
+    }
+
+    fun get(i: int): int {
+        if (i < 0 || i >= count) {
+            panic("index ${i} is outside 0..${count}")
+        }
+        unsafe {
+            return Memory.load32(data + 4 * i)
+        }
+    }
+
+    fun release() {
+        unsafe {
+            Memory.free(data)
+        }
+        data = 0
+        count = 0
+        capacity = 0
+    }
+}
+
+var xs = new Ints32()
+for i in 0..100 {
+    xs.push(i * i)
+}
+print(xs.get(10), xs.count)  // 100 100
+xs.release()
+```
+
+## What can go wrong
+
+Nothing checks an address. Reading or writing outside a block, using a block after `free`, freeing a block twice,
+or passing an address that never came from `alloc` or `resize` is undefined: the program may crash, print wrong
+results or corrupt its own values somewhere else. Keep the arithmetic on addresses in one place, like `Ints32` above,
+and test it on every target you build for.
+
+## On each target
+
+| Target | Where the memory comes from |
+| --- | --- |
+| bvm and native executables | the system allocator, through the runtime function `Mem`; addresses are real machine addresses, so they can be handed to [inline assembly](../language/inline-assembly.mdx) |
+| JavaScript | a heap in an `ArrayBuffer` that grows when needed; addresses are offsets into it, and freed blocks are not reused |

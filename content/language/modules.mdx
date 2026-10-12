@@ -95,6 +95,7 @@ therefore not depend on a cycle.
 | `std/date`, `std/time` | dates, times, `sleep` ([date](../stdlib/date.mdx), [time](../stdlib/time.mdx)) |
 | `std/random` | random numbers ([page](../stdlib/collections.mdx)) |
 | `std/testing` | `test`, `expectEqual` and friends ([page](../tooling/testing.mdx)) |
+| `std/memory` | raw memory for unsafe code: `Memory.alloc`, loads, stores, `copy` and `fill` ([page](../stdlib/memory.mdx)) |
 
 The `std/` prefix is optional (`import "math"`). When a program uses a standard library function without importing its
 module, the error says which module to import, and `burn fix` adds the import.
