@@ -17,6 +17,14 @@ const SECTIONS: Record<string, string> = {
   bvm: 'The Burn VM'
 };
 
+const BLURBS: Record<string, string> = {
+  language: 'The language itself: variables and types, functions and closures, match, structs and enums, generics, null safety, modules and async.',
+  stdlib: 'What ships with Burn: the built-in functions and the modules for math, strings, files, processes, JSON, HTTP and time.',
+  tooling: 'Working with Burn: the command line, projects and packages, tests, the REPL, the formatter, editors and native builds.',
+  internals: 'What happens in the background, from the parser and type checker to values in memory, reference counting and bvm.',
+  bvm: 'The Burn Virtual Machine on its own: its assembly language, instructions, linking, archives, mixins and embedding.'
+};
+
 const sources = import.meta.glob('/content/**/*.mdx', {
   query: '?raw',
   import: 'default',
@@ -47,7 +55,7 @@ const LANGS: Record<string, string> = {
 };
 
 const highlighter = await createHighlighter({
-  themes: ['github-light', 'github-dark'],
+  themes: ['vitesse-light', 'vitesse-dark'],
   langs: [
     { ...(burnGrammar as unknown as LanguageRegistration), name: 'burn', aliases: ['bn'] },
     { ...(bvmGrammar as unknown as LanguageRegistration), name: 'bvm' },
@@ -130,11 +138,11 @@ function highlight(code: string, lang: string): string {
   const body = name
     ? highlighter.codeToHtml(code, {
         lang: name,
-        themes: { light: 'github-light', dark: 'github-dark' },
+        themes: { light: 'vitesse-light', dark: 'vitesse-dark' },
         defaultColor: 'light'
       })
     : `<pre class="shiki plain"><code>${escapeHtml(code)}</code></pre>`;
-  return `<div class="code-block"><div class="code-head"><span>${escapeHtml(label)}</span><button type="button" class="copy" aria-label="Copy code">Copy</button></div>${body}</div>`;
+  return `<div class="code-block" data-lang="${escapeHtml(label)}"><button type="button" class="copy" aria-label="Copy code">Copy</button>${body}</div>`;
 }
 
 function render(file: string, body: string): { html: string; headings: Heading[] } {
@@ -190,7 +198,7 @@ function build(): Page[] {
       text: stripTags(
         html
           .replace(/<a class="anchor"[^>]*>#<\/a>/g, '')
-          .replace(/<div class="code-head">[\s\S]*?<\/div>/g, ' ')
+          .replace(/<button type="button" class="copy"[^>]*>Copy<\/button>/g, ' ')
       )
         .replace(/\s+/g, ' ')
         .trim(),
@@ -242,3 +250,15 @@ export function searchIndex(): SearchEntry[] {
 export const images: Record<string, string> = Object.fromEntries(
   Object.entries(imageSources).map(([path, svg]) => [path.slice(path.lastIndexOf('/') + 1), svg])
 );
+
+export function sectionSummaries(): { id: string; title: string; blurb: string; href: string; pages: PageLink[] }[] {
+  return navigation()
+    .filter((s) => s.id !== '')
+    .map((s) => ({ id: s.id, title: s.title, blurb: BLURBS[s.id] ?? '', href: s.pages[0].href, pages: s.pages.slice(0, 6) }));
+}
+
+export function installCommand(): string {
+  const src = sources['/content/tooling/installation.mdx'] ?? '';
+  const block = src.match(/```sh\n([^\n]*)/);
+  return block ? block[1] : '';
+}

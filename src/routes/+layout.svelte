@@ -11,9 +11,13 @@
   let menuOpen = $state(false);
   let searchOpen = $state(false);
   let theme = $state<'light' | 'dark'>('light');
+  let mac = $state(false);
+
+  let home = $derived(page.params.slug === '');
 
   $effect(() => {
     theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    mac = /Mac|iPhone|iPad/.test(navigator.platform);
   });
 
   afterNavigate(() => {
@@ -60,54 +64,46 @@
 <svelte:window {onkeydown} {onclick} />
 
 <header>
-  <button class="icon menu" aria-label="Open the navigation" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
-    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-    </svg>
-  </button>
-  <a class="brand" href={resolve('/[...slug]', { slug: '' })}>
-    <img src={asset('logo.svg')} alt="" width="30" height="30" />
-    <span>Burn</span>
-    <span class="tag">docs</span>
-  </a>
-  <button class="search" onclick={() => (searchOpen = true)}>
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-      <path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-    </svg>
-    <span>Search</span>
-    <kbd>/</kbd>
-  </button>
-  <nav class="links" aria-label="External links">
-    <a href="https://github.com/burnlang/burn" class="icon" aria-label="Burn on GitHub">
+  <div class="bar">
+    <button class="menu" aria-label="Open the navigation" aria-expanded={menuOpen} onclick={() => (menuOpen = !menuOpen)}>
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-        <path
-          fill="currentColor"
-          d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
-        />
+        <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
       </svg>
-    </a>
-    <button class="icon" aria-label={theme === 'dark' ? 'Use the light theme' : 'Use the dark theme'} onclick={toggleTheme}>
-      {#if theme === 'dark'}
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="2" />
-          <path
-            d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          />
-        </svg>
-      {:else}
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-        </svg>
-      {/if}
     </button>
-  </nav>
+    <a class="brand" href={resolve('/[...slug]', { slug: '' })}>
+      <img src={asset('logo.svg')} alt="" width="22" height="22" />
+      <span class="word">burn</span>
+      <span class="slash">/</span>
+      <span class="docs">docs</span>
+    </a>
+    <button class="search" onclick={() => (searchOpen = true)}>
+      <span>Search the docs</span>
+      <kbd>{mac ? '⌘' : 'Ctrl'} K</kbd>
+    </button>
+    <nav class="links" aria-label="Elsewhere">
+      <a href="https://github.com/burnlang/burn">GitHub</a>
+      <button class="theme" aria-label={theme === 'dark' ? 'Use the light theme' : 'Use the dark theme'} onclick={toggleTheme}>
+        {#if theme === 'dark'}
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path
+              d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+        {:else}
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+          </svg>
+        {/if}
+      </button>
+    </nav>
+  </div>
 </header>
 
-<div class="shell">
+<div class="shell" class:home>
   <aside class:open={menuOpen}>
     <nav aria-label="Documentation">
       {#each data.nav as section (section.id)}
@@ -139,96 +135,111 @@
     position: sticky;
     top: 0;
     z-index: 30;
-    height: var(--header-h);
+    background: var(--bg);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0 16px;
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
+    gap: 1.25rem;
+    height: var(--header-h);
+    max-width: 1480px;
+    margin: 0 auto;
+    padding: 0 24px;
   }
 
   .brand {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--fg);
-    font-weight: 700;
-    font-size: 1.15rem;
+    gap: 0.45rem;
     text-decoration: none;
+    color: var(--ink);
   }
 
-  .tag {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--accent-strong);
-    background: var(--accent-soft);
-    border-radius: 999px;
-    padding: 0.05rem 0.5rem;
+  .word {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: -0.03em;
+  }
+
+  .slash {
+    color: var(--rule);
+    font-size: 1.2rem;
+    margin: 0 -0.1rem;
+  }
+
+  .docs {
+    color: var(--muted);
+    font-size: 0.95rem;
   }
 
   .search {
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-    width: min(320px, 40vw);
-    padding: 0.4rem 0.7rem;
+    justify-content: space-between;
+    gap: 1rem;
+    width: min(280px, 34vw);
+    padding: 0.35rem 0.45rem 0.35rem 0.75rem;
     font: inherit;
-    font-size: 0.9rem;
-    color: var(--fg-soft);
-    background: var(--bg-soft);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--faint);
+    background: var(--surface);
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: text;
   }
 
-  .search span {
-    flex: 1;
-    text-align: left;
-  }
-
-  .search kbd {
-    font-size: 0.72rem;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 0 0.35rem;
+  .search:hover {
+    border-color: var(--rule);
   }
 
   .links {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.9rem;
+    font-size: 0.92rem;
   }
 
-  .icon {
+  .links a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  .links a:hover {
+    color: var(--ink);
+  }
+
+  .theme,
+  .menu {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    color: var(--fg-soft);
-    background: transparent;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: var(--muted);
+    background: none;
     border: 0;
-    border-radius: 8px;
+    border-radius: 6px;
     cursor: pointer;
   }
 
-  .icon:hover {
-    color: var(--fg);
-    background: var(--bg-soft);
-    text-decoration: none;
+  .theme:hover,
+  .menu:hover {
+    color: var(--ink);
   }
 
   .menu {
     display: none;
+    margin-left: -6px;
   }
 
   .shell {
     display: flex;
-    max-width: 1440px;
+    max-width: 1480px;
     margin: 0 auto;
   }
 
@@ -238,47 +249,53 @@
     flex: 0 0 var(--sidebar-w);
     height: calc(100vh - var(--header-h));
     overflow-y: auto;
-    padding: 1.2rem 0.8rem 3rem 16px;
-    border-right: 1px solid var(--border);
+    padding: 1.75rem 1.25rem 4rem 24px;
+    scrollbar-width: thin;
+  }
+
+  .shell.home aside {
+    display: none;
+  }
+
+  aside section + section {
+    margin-top: 1.6rem;
   }
 
   aside h2 {
-    margin: 1.1rem 0 0.3rem;
-    padding-left: 0.6rem;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--fg-soft);
-  }
-
-  aside section:first-child h2 {
-    margin-top: 0;
+    margin: 0 0 0.35rem;
+    font-family: var(--display);
+    font-size: 0.95rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
 
   aside ul {
     list-style: none;
     margin: 0;
     padding: 0;
+    border-left: 1px solid var(--rule);
   }
 
   aside a {
     display: block;
-    padding: 0.28rem 0.6rem;
-    border-radius: 7px;
-    color: var(--fg);
-    font-size: 0.92rem;
+    margin-left: -1px;
+    padding: 0.22rem 0 0.22rem 0.85rem;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+    font-size: 0.9rem;
     line-height: 1.4;
-  }
-
-  aside a:hover {
-    background: var(--bg-soft);
     text-decoration: none;
   }
 
+  aside a:hover {
+    color: var(--ink);
+  }
+
   aside a[aria-current='page'] {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 500;
+    border-left-color: var(--accent);
   }
 
   main {
@@ -290,34 +307,41 @@
     display: none;
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 960px) {
+    .bar {
+      padding: 0 16px;
+      gap: 0.75rem;
+    }
+
     .menu {
       display: inline-flex;
     }
 
-    .search span {
-      display: none;
-    }
-
     .search {
       width: auto;
+      flex: 1;
+      max-width: 220px;
     }
 
     .search kbd {
       display: none;
     }
 
-    .brand .tag {
+    .links a {
       display: none;
     }
 
-    aside {
+    aside,
+    .shell.home aside {
+      display: block;
       position: fixed;
       z-index: 25;
       left: 0;
       top: var(--header-h);
-      width: min(300px, 85vw);
+      width: min(300px, 86vw);
       background: var(--bg);
+      border-right: 1px solid var(--rule);
+      padding-left: 20px;
       transform: translateX(-100%);
       visibility: hidden;
       transition:
@@ -328,7 +352,6 @@
     aside.open {
       transform: none;
       visibility: visible;
-      box-shadow: var(--shadow);
     }
 
     .scrim {
@@ -337,7 +360,20 @@
       inset: var(--header-h) 0 0 0;
       z-index: 20;
       border: 0;
-      background: rgb(20 12 6 / 0.35);
+      background: rgb(0 0 0 / 0.3);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .docs,
+    .slash {
+      display: none;
+    }
+
+    .search span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 </style>
