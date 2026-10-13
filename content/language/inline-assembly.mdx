@@ -6,6 +6,8 @@ order: 22
 
 # Inline assembly
 
+> Available since Burn `26.1.0-experimental-5`.
+
 An `asm` block puts code for the machine straight into a Burn function. Burn builds for several targets, so one block
 holds a section for each target it supports, and the compiler picks the section for the target it builds:
 
@@ -43,6 +45,9 @@ print(add(2, 40))  // 42 on every target
 ```
 
 Assembly is [unsafe code](./unsafe.mdx): an `asm` block must be in an `unsafe` block or an `unsafe fun`.
+
+[`examples/low_level.bn`](https://github.com/burnlang/burn/blob/master/examples/low_level.bn) in the Burn repository puts
+inline assembly and [raw memory](../stdlib/memory.mdx) together in one small program that runs on every target.
 
 ## Sections
 

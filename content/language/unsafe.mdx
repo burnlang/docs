@@ -6,6 +6,8 @@ order: 21
 
 # Unsafe code
 
+> Available since Burn `26.1.0-experimental-5`.
+
 Burn checks a program before it runs: types, initialization, overflow, array bounds and memory are all taken care of.
 A few things are out of the compiler's reach, because they work below the language. The main one is
 [inline assembly](./inline-assembly.mdx). Code like that goes in an `unsafe` block, which marks the spot where you,
