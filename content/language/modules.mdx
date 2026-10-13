@@ -135,6 +135,57 @@ Forgetting the alias gets a suggestion too: with `import "std/memory" as Mem`, a
 "cannot find `Memory` in this scope" with ``help: did you mean `Mem.Memory`?``. The language server completes the
 names of a module after `Alias.`, and the members of a type after `Alias.Type.`.
 
+## Imports inside functions and blocks
+
+> Available since Burn `26.1.0-experimental-6`.
+
+An `import` can also stand inside a function, a method or any block. What it imports is then visible only there,
+from the import to the end of the block, and in the lambdas written inside it:
+
+```burn
+fun root(x: float): float {
+    import "std/math"
+    return sqrt(x)
+}
+
+fun cube(x: int): int {
+    if (x > 0) {
+        import "std/math" as M
+        return M.pow(x, 3)
+    }
+    return 0
+}
+
+fun scaled(xs: [float]): [float] {
+    import (
+        "std/list"
+        "std/math"
+    )
+    return map(xs, fun(x: float): float { return floor(x * 2.5) })
+}
+
+print(root(49.0), cube(3), scaled([1.0, 2.0]))  // 7.0 27 [2.0, 5.0]
+```
+
+Outside the block the names are gone again, so using them is an error like any other unknown name:
+
+```text
+error: `sqrt` is in the standard library module `std/math`
+ --> app.bn:6:12
+  |
+6 |     return sqrt(9.0)
+  |            ^^^^
+help: import it with `import "std/math"`
+```
+
+- Use a local import to keep a module that only one function needs out of the rest of the file, or to give a
+  module a short [alias](#import-aliases) right where it is used.
+- Only the names are local. The module is loaded with the program and initialized once, before the file that
+  imports it, wherever the `import` stands; a block that runs many times does not load it again.
+- Names from a local import come after the file's own names, like any import, and two imports that define the same
+  name make it ambiguous where both are visible.
+- [Bytecode libraries](../bvm/native-interop.mdx#using-a-library-from-burn) can only be imported at the top level of a file.
+
 ## Initialization order
 
 Each module's top level statements run once, before the statements of the modules that import it, and the program's
