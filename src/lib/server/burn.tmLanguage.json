@@ -8,6 +8,7 @@
     { "include": "#annotations" },
     { "include": "#definitions" },
     { "include": "#functions" },
+    { "include": "#imports" },
     { "include": "#keywords" },
     { "include": "#strings" },
     { "include": "#numbers" },
@@ -67,6 +68,18 @@
           "captures": {
             "1": { "name": "keyword.declaration.function.burn" },
             "2": { "name": "entity.name.function.burn" }
+          }
+        }
+      ]
+    },
+    "imports": {
+      "patterns": [
+        {
+          "match": "(\"[^\"\\\\]*\")\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "string.quoted.double.burn" },
+            "2": { "name": "keyword.control.import.burn" },
+            "3": { "name": "entity.name.namespace.burn" }
           }
         }
       ]

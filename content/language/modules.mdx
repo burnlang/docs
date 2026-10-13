@@ -62,13 +62,78 @@ If two imports define the same name, using it is reported as ambiguous.
 ## Names from several modules
 
 Importing a module brings its public names into the importing file, unqualified: after `import "std/strings"`,
-`padLeft` is just `padLeft`. There is no `import ... as` and no `module.name` syntax.
+`padLeft` is just `padLeft`. To keep a module's names apart from your own, import it [with an alias](#import-aliases)
+instead.
 
 - A name declared in the file itself takes precedence over an imported one with the same name.
 - When two imported modules both define a name and the file does not, using it is an error that names both modules:
   "`area` is ambiguous: it is defined in geo.bn and shapes.bn". Rename one of them, or declare a function in your own
   file that calls the one you mean.
 - Only names are imported, never statements: importing a module twice, or from several files, loads and runs it once.
+
+## Import aliases
+
+> Available since Burn `26.1.0-experimental-6`.
+
+`import "path" as Name` loads a module without bringing its names into the file. They are used through the alias
+instead, as `Name.something`:
+
+```burn
+import "std/memory" as Mem
+import "std/math" as M
+import "../shared/geometry.bn" as Geo
+
+var v = Geo.make(3.0, 4.0)
+print(Geo.length(v), M.PI, M.sqrt(16.0), M.Math.gcd(12, 18))
+
+unsafe {
+    var p = Mem.Memory.alloc(8)
+    Mem.Memory.store64(p, 99)
+    print(Mem.Memory.load64(p))  // 99
+    Mem.Memory.free(p)
+}
+```
+
+An alias works everywhere the name it stands for works:
+
+| Where | Example |
+| --- | --- |
+| values and functions | `Geo.make(1.0, 2.0)`, `M.PI` |
+| the standard library's built-in functions | `M.sqrt(2.0)`, `M.max(a, b)` |
+| static members | `M.Math.gcd(12, 18)`, `Mem.Memory.alloc(16)` |
+| types | `Geo.Vec2 v = ...`, `fun norm(a: Geo.Vec2): float`, `[Geo.Vec2]`, `Geo.Vec2?` |
+| creating values | `new Geo.Point(1, 2)`, `Geo.Vec2 { x: 1.0, y: 2.0 }`, `new C.Stack<int>()` |
+| enums and `match` | `Tok.Token.End`, `Tok.Token.Word(text) => ...` |
+| string templates | `"${Geo.length(v)}"` |
+
+- An alias can be used in an import list too, next to plain imports:
+
+  ```burn
+  import (
+      "std/collections" as C
+      "std/list"
+  )
+  ```
+
+- Only the module's public names are reachable through the alias; private ones are reported as private.
+- The alias is a name of its own in the file: it cannot also be the name of something the file declares, and one
+  alias names one module. The same module can be imported once with an alias and once without.
+- The module is still loaded and initialized only once, however it is imported.
+
+Mistakes point at the alias:
+
+```text
+error: `M` (the module `std/math`) has no public name `Maht`
+ --> app.bn:3:7
+  |
+3 | print(M.Maht.gcd(12, 18))
+  |       ^^^^^^
+help: did you mean `M.Math`?
+```
+
+Forgetting the alias gets a suggestion too: with `import "std/memory" as Mem`, a plain `Memory.alloc(8)` reports
+"cannot find `Memory` in this scope" with ``help: did you mean `Mem.Memory`?``. The language server completes the
+names of a module after `Alias.`, and the members of a type after `Alias.Type.`.
 
 ## Initialization order
 
