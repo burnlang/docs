@@ -42,6 +42,7 @@ operations that need it.
 | an [`asm` block](./inline-assembly.mdx) | the compiler cannot see what the assembly does to memory, registers or the stack |
 | calling an `unsafe fun` | the function relies on its caller to hold up rules the compiler cannot check |
 | raw memory from [`std/memory`](../stdlib/memory.mdx) | its functions are `unsafe fun`s: nothing checks that an address points into a live block |
+| calling a [C function](./calling-c.mdx) | nothing checks what C does with memory |
 | using an `unsafe fun` as a value | a function value can be called anywhere, so taking it counts as calling it |
 
 Anywhere else, these are compile errors:

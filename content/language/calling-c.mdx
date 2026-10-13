@@ -1,0 +1,126 @@
+---
+title: Calling C
+description: "@Extern: native code calls C functions such as libc, and C calls Burn functions back."
+order: 23
+---
+
+# Calling C
+
+> Available since Burn `26.1.0-experimental-7`.
+
+Native executables can call C functions directly, and C code can call Burn functions. A function marked `@Extern` is
+the bridge in both directions:
+
+```burn
+import "std/memory"
+
+@Extern("strlen")
+fun strlen(s: int): int
+
+@Extern("sqrt")
+fun cSqrt(x: float): float
+
+unsafe {
+    var p = Memory.alloc(16)
+    Memory.store8(p, 104)
+    Memory.store8(p + 1, 105)
+    print(strlen(p), cSqrt(2.0))  // 2 1.4142135623730951
+    Memory.free(p)
+}
+```
+
+## Calling a C function
+
+`@Extern("name")` on a top-level function **without a body** declares a C function: calls to it call the C symbol
+`name`. Without an argument, the symbol is the function's own name.
+
+- **Types.** Parameters and the result can be `int` (a 64-bit integer), a [sized integer](./types.mdx) such as
+  `Int32` or `UInt8`, `float` (a C `double`) or `bool`, and the result can be `void`. C knows nothing about Burn's
+  strings, arrays or structs, so pass memory as an `int` address, for example a block from
+  [`std/memory`](../stdlib/memory.mdx).
+- **Results.** A sized integer comes back the way C returns it and is widened like the type says: an `Int32` result
+  of `-1` is `-1`, a `UInt8` result keeps only its lowest 8 bits.
+- **Registers.** At most 6 integer and 8 float parameters, which is what C passes in registers on every platform
+  Burn supports. Variadic functions such as `printf` are not supported.
+- **Return type.** It must be written, `: void` when there is none.
+- **Unsafe.** Nothing checks what a C function does with memory, so calling one, or using it as a value, needs
+  [unsafe code](./unsafe.mdx).
+
+The C function has to be linked into the executable. libc and the math library always are, since native Burn
+programs link against them.
+
+## Letting C call Burn
+
+`@Extern("name")` on a function **with a body** makes it visible to C under the symbol `name`, in addition to being an
+ordinary Burn function. The same types are allowed. C finds its arguments where it put them, and the function keeps
+the registers C expects to survive a call.
+
+A comparator for C's `qsort` is a typical use:
+
+```burn
+import "std/memory"
+
+@Extern("qsort")
+fun qsort(base: int, n: int, size: int, cmp: int): void
+
+@Extern("compare_ints")
+fun compareInts(a: int, b: int): Int32 {
+    var x = 0
+    var y = 0
+    unsafe {
+        x = Memory.load64(a)
+        y = Memory.load64(b)
+    }
+    if (x < y) {
+        return -1
+    }
+    if (x > y) {
+        return 1
+    }
+    return 0
+}
+```
+
+C takes the address of a function, which Burn gets from [inline assembly](./inline-assembly.mdx):
+
+```burn
+unsafe {
+    var cmp = 0
+    asm {
+        x86_64 {
+            lea rax, [rip + compare_ints]
+            mov {cmp}, rax
+        }
+        arm64 {
+            adrp x9, compare_ints
+            add x9, x9, :lo12:compare_ints
+            str x9, {cmp}
+        }
+    }
+    qsort(xs, 5, 8, cmp)
+}
+```
+
+On macOS, C symbols start with an underscore. Burn adds it for you, so write the name as C code would. In
+assembly, write the underscore yourself: `_compare_ints`.
+
+## On each target
+
+| Target | `@Extern` without a body | `@Extern` with a body |
+| --- | --- | --- |
+| native executables | calls the C function | also visible to C under its symbol |
+| bvm (`burn app.bn`, `burni`, `.bvmc`) | calling it is a runtime error that names the C function | an ordinary function |
+| JavaScript | calling it is a runtime error | an ordinary function |
+
+So a program that only calls C on native targets still runs everywhere, like an [`asm` block](./inline-assembly.mdx)
+without a section for the target.
+
+## Under the hood
+
+Burn functions pass their arguments on the stack. For a C function, the compiler writes a small piece of code that
+loads the arguments into the registers the C calling convention uses (`rdi`, `rsi`, … and `xmm0`, … on x86-64,
+`x0`, … and `d0`, … on arm64), aligns the stack, calls the symbol and widens the result. For a Burn function C can
+call, it writes the opposite: code that saves the registers C expects to keep, pushes C's register arguments in
+Burn's order and calls the Burn function.
+
+The rest of Burn uses the same mechanism to move its own runtime and bvm from Rust to Burn.
