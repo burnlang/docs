@@ -101,8 +101,12 @@ unsafe {
 }
 ```
 
-On macOS, C symbols start with an underscore. Burn adds it for you, so write the name as C code would. In
-assembly, write the underscore yourself: `_compare_ints`.
+On macOS, C symbols start with an underscore. Burn adds it for you in `@Extern`, so write the name as C code
+would. In assembly, write the symbol as the macOS assembler expects it: `lea rax, [rip + _compare_ints]` on x86-64,
+and `adrp x9, _compare_ints@PAGE` followed by `add x9, x9, _compare_ints@PAGEOFF` on arm64. Because an `asm` section
+cannot tell Linux from macOS, a program that has to build on both can let a line of C hand it the address instead:
+`void *compare_ints_address(void) { return compare_ints; }`, declared in Burn as
+`@Extern("compare_ints_address") fun compareIntsAddress(): int`.
 
 ## On each target
 
