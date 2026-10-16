@@ -3,7 +3,7 @@
 The documentation of the [Burn programming language](https://github.com/burnlang/burn): the language, the standard
 library, the toolchain, how Burn works in the background, and the Burn Virtual Machine.
 
-Read it at **https://burnlang.github.io/docs/**.
+Read it at **https://s42yt.github.io/burn-docs/**.
 
 ## Layout
 
@@ -61,8 +61,9 @@ npm run build      # write the static site to build/
 npm run preview    # serve build/
 ```
 
-Set `BASE_PATH` when the site is served from a subpath: `BASE_PATH=/docs npm run build` for GitHub Pages. Pushes to
-`master` deploy it there.
+Set `BASE_PATH` when the site is served from a subpath, such as `BASE_PATH=/burn-docs npm run build`. The site at
+https://s42yt.github.io/burn-docs/ is built from `master` of this repository by
+[S42yt/burn-docs](https://github.com/S42yt/burn-docs) every hour.
 
 ## License
 
