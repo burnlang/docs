@@ -1,6 +1,6 @@
 ---
 title: Migrating from the Go version
-description: What changed in the Rust rewrite and how to update existing code.
+description: What changed since the Go version and how to update existing code.
 order: 66
 ---
 
@@ -10,7 +10,7 @@ order: 66
 | --- | --- |
 | `type Person { ... }` | `def type Person { ... }` |
 | `class Human { fun create(...) ... }` | `def struct Human(...) { ... static fun create(...) ... }` |
-| interpreter written in Go | compiler written in Rust and x86-64 assembly |
+| interpreter written in Go | compiler, bvm and runtime written in Burn, native code for x86-64 and arm64 |
 | `burn -exe file.bn` embedded the source in a Go program | `burn build file.bn` produces real machine code |
 | every number was a float | `int` and `float` are separate types |
 | `toString(x)` needed for `"a" + x` | `"a" + x` converts automatically |
@@ -42,7 +42,7 @@ print(Human.greet(john))
 
 ## Classes to structs
 
-Earlier versions of the Rust rewrite had `def class`. Classes were replaced by
+Earlier versions of the rewrite had `def class`. Classes were replaced by
 [structs](./language/structs-and-interfaces.mdx), and `def class` is now a compile error ("classes are now
 structs"). To update a class:
 

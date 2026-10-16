@@ -62,7 +62,9 @@ The older flags still work: `-r`, `-e`, `-exe <file>` and `-d`.
 | `BURN_PLATFORM` | build native executables for another platform: `linux-x86_64`, `macos-x86_64`, `linux-aarch64` or `macos-aarch64` ([cross-compiling](./cross-compiling.mdx)) |
 | `BURN_RUNTIME_DIR` | the folder with the runtime native executables link against (default `share/burn/lib`) |
 | `NO_COLOR` | disable colored diagnostics |
-| `BURN_CLI_BVM` | the command line module bvm runs when it is started as `burn`, `burni`, `burnc` or `burn-lsp` (default `share/burn/burn.bvm` next to its `bin/`) |
+| `BURN_JIT` | `0` turns bvm's [JIT](../bvm/optimizing.mdx) off, so everything is interpreted |
+| `BURN_JIT_THRESHOLD` | how many calls or loop turns make a function hot enough for the JIT (default 1000) |
+| `BURN_SYMBOLS` | `1` names every function in the assembly of native builds, for debuggers and profilers |
 | `BURN_HOME` | where packages are found (default `~/.burn`, packages in `packages/`) |
 | `BURN_GC_THRESHOLD` | bytes allocated between two searches for unreachable cycles (default 32 MB) |
 | `BURN_GC_STATS` | print a line after every cycle search |

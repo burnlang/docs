@@ -28,10 +28,10 @@ knows the static type of its arguments.
 ## Runtime
 
 All values are 64 bit words. Ints, floats, bools and enums are stored directly, everything else is a pointer to a
-heap object with a 16 byte header (kind, flags, type id, size). The runtime core is part of bvm and written in
-Rust (`bvm/runtime`): memory and reference counting with a cycle collector, strings, arrays, maps, boxing for
-`any`, formatting, HTTP, files and async tasks. The functions built on top of it, such as `split`, `trim` or
-`parseJSON`, are written in Burn (`lib/runtime`), compiled to a bvm module that bvm links into every program.
+heap object with a 16 byte header (kind, flags, type id, size). The runtime is written in Burn (`lib/rt`): memory
+and reference counting with a cycle collector, strings, arrays, maps, boxing for `any`, formatting, JSON, HTTP, files
+and async tasks. It calls the C library through `@Extern`, is compiled into the toolchain for bvm, and is linked into
+native executables as `libburn_runtime.a`.
 
 ## Ownership
 
@@ -49,8 +49,9 @@ computed once from the type graph.
 general-purpose stack VM with its own assembly language, bytecode format and verifier. Burn structs become
 `struct` types, interface methods become dispatch tables, `async` calls become `spawn`, and every operation that
 can fail carries its source location. When the module is loaded, the verifier computes each function's frame
-size and common sequences are fused into superinstructions for loops, comparisons and field access. Checking and
-compiling a typical program takes a few milliseconds, so running a file feels like using an interpreter.
+size and common sequences are fused into superinstructions for loops, comparisons and field access; functions that
+run often are compiled to machine code by [the JIT](../bvm/optimizing.mdx). Checking and compiling a typical program
+takes a few milliseconds, so running a file feels like using an interpreter.
 `burnc --target bvm` writes the same module to a `.bvmc` file, and `--target bar` into an archive.
 
 ## Native code
@@ -61,10 +62,10 @@ expressions evaluate into `rax` or `x0`, comparisons in conditions become compar
 access are inlined, and interface calls go through per-method dispatch tables. Both generators share the data layout,
 the order of arguments on the stack and the code that decides what a native program exports
 (`compiler/src/native/shared.bn`), so the same runtime serves both. The program entry point and the
-trampoline that starts async tasks are hand-written assembly. The assembly is linked by `cc` with a static build of
-the runtime (bvm and its runtime core, compiled by `scripts/native-runtime.sh` into `share/burn/lib`), so the result
-is a standalone executable. A program that imports bytecode libraries embeds them, and bvm runs them inside the
-executable.
+trampoline that starts async tasks are generated assembly. The assembly is linked by `cc` with the runtime
+(`libburn_runtime.a`, built by `scripts/native-runtime.sh` into `share/burn/lib`), so the result is a standalone
+executable. A program that imports bytecode libraries is compiled to bytecode instead and linked with bvm
+(`libburn_launcher.a`), which runs it inside the executable.
 
 `--target js` turns the IR into one JavaScript file instead (`compiler/src/js/js.bn`), with a runtime written in
 JavaScript in front of it (`lib/js/prelude.js`): every function becomes a JavaScript function, records become arrays
@@ -72,15 +73,18 @@ tagged with their type, and checked operations call small helpers that report th
 
 ## Without the standard library
 
-Programs built with `--no-std` or `std = false` link only the built-in core of the runtime (`libburn_core.a`, the
-runtime core built without `std`), and the checker rejects the features it leaves out ([details](./no-std.mdx)).
+Programs built with `--no-std` or `std = false` cannot import the standard library, and the checker rejects the
+features it leaves out ([details](./no-std.mdx)).
 
 ## Bootstrapping
 
-The compiler builds itself. bvm runs the boot compiler kept in the repository (`compiler/boot/compiler.bvmc`, a
-compiled copy of the compiler), which compiles `compiler/src` once; that compiler builds itself again, and both
-results must be the same module (`scripts/bootstrap.sh`). Building needs only Rust, for bvm; until
-`26.1.0-experimental-4` a released Burn (stage0) started the bootstrap instead. Releases up to
+The compiler builds itself. The C compiler assembles the seed kept in the repository (`compiler/boot/<platform>.tar.xz`,
+the compiler as assembly), which compiles `compiler/src` once; that compiler builds itself again, and both results
+must be the same assembly (`scripts/bootstrap.sh`). Building needs only a C compiler, tar and xz
+([details](../internals/toolchain.mdx#how-the-compiler-builds-itself)). Until `26.1.0-experimental-4` a released Burn
+(stage0) started the bootstrap, and until `26.1.0-experimental-7` a bytecode copy of the compiler run by the bvm
+written in Rust. Releases up to
 `26.1.0-experimental-2` were compiled by a compiler written in Rust; it was retired once the compiler written in Burn
 did everything it did. `26.1.0-experimental-3` shipped without the native and JavaScript backends, and
-`26.1.0-experimental-4` brings both back, ported to Burn.
+`26.1.0-experimental-4` brings both back, ported to Burn. Since `26.1.0-experimental-7` bvm and the runtime are
+written in Burn too, and no Rust is left.

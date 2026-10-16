@@ -9,8 +9,8 @@ order: 0
 # Burn
 
 Burn is a general purpose programming language with a clean syntax, static types that you rarely have to write,
-and smart casts that follow your `if` checks. The compiler and its tools are written in Burn and run on bvm, the Burn
-virtual machine, which is written in Rust.
+and smart casts that follow your `if` checks. Burn is written in Burn: the compiler, its tools, the runtime and bvm,
+the Burn virtual machine with its JIT, are Burn programs compiled to native code.
 
 ```burn
 def interface Shape {
@@ -47,7 +47,7 @@ All backends share the same type checker and runtime library (the JavaScript bui
 JavaScript that matches it), so a program behaves the same way everywhere.
 
 The virtual machine, [bvm](./bvm/overview.mdx), is not tied to Burn: it has its own assembly language, bytecode
-format, verifier and Rust API, and other languages can compile to it.
+format, verifier, JIT and API, and other languages can compile to it.
 
 ## Where to go next
 
@@ -107,5 +107,5 @@ format, verifier and Rust API, and other languages can compile to it.
   - [Burn archives (.bar)](./bvm/archives.mdx)
   - [Mixins](./bvm/mixins.mdx)
   - [Native interop](./bvm/native-interop.mdx)
-  - [Optimizing while running](./bvm/optimizing.mdx)
+  - [The JIT](./bvm/optimizing.mdx)
 - [Migrating from the Go version](./migration.mdx)
