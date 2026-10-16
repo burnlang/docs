@@ -7,7 +7,7 @@ order: 65
 # The JIT
 
 bvm gets faster as a program runs. It starts every function in the interpreter, counts how often each one is called
-and how often its loops turn, and compiles the hot ones to x86-64 machine code while the program keeps running. There
+and how often its loops turn, and compiles the hot ones to machine code (x86-64 or arm64) while the program keeps running. There
 is nothing to configure and no cache on disk, and it works for every language built on bvm, not just Burn.
 
 ![Functions start in the interpreter and are compiled to machine code when they get hot](../images/tiering.svg)
@@ -54,9 +54,13 @@ error names the same line and column. Threads started with `async` share the com
 The results are always the same; only the speed changes. Burn's test suite runs every test program with
 `BURN_JIT_THRESHOLD=1` and with `BURN_JIT=0` and compares their output with the native executables.
 
-The JIT runs on x86-64 Linux and macOS. On arm64 (Apple silicon and Linux), bvm interprets for now.
+The JIT runs on Linux and macOS, on x86-64 (`compiler/src/bvm/jit_x86.bn`) and arm64, Macs with Apple silicon
+included (`jit_arm64.bn`). Both code generators share the tracking of the operand stack and jumps (`jitbase.bn`).
+On arm64 the accumulator is `x9` and the frame base `x19`; on x86-64 they are `rax` and `rbx`.
 
 ## Numbers
+
+Measured on x86-64 Linux:
 
 | Program | Interpreted | With the JIT | Native executable |
 | --- | --- | --- | --- |
