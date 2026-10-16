@@ -127,4 +127,4 @@ loads the arguments into the registers the C calling convention uses (`rdi`, `rs
 call, it writes the opposite: code that saves the registers C expects to keep, pushes C's register arguments in
 Burn's order and calls the Burn function.
 
-The rest of Burn uses the same mechanism to move its own runtime and bvm from Rust to Burn.
+Burn uses the same mechanism for its own runtime and bvm, which are written in Burn and call the C library this way.

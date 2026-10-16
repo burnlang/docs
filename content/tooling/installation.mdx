@@ -38,9 +38,9 @@ See [the toolchain](./toolchain.mdx) for what each command does.
 
 - Linux or macOS (Windows: see [manual installation](#manual-installation))
 - `git`, which burnup and ash use to download Burn versions and packages
-- Rust 1.85 or newer for versions built from source (branches such as `master`, and any version without a
-  prebuilt release), which builds bvm. Pass `--install-rust` to the installer to get it with rustup. Nothing else is
-  needed: bvm runs the boot compiler that comes with the sources.
+- A C compiler (`cc`), `tar` and `xz` for versions built from source (branches such as `master`, and any version
+  without a prebuilt release): the C compiler assembles the seed that comes with the sources, which builds the rest.
+  Nothing else is needed, no Burn and no Rust.
 - A C toolchain (`cc`) to build native executables with `burnc`. Everything else works without it.
 
 ## Versions
@@ -93,7 +93,6 @@ burnup self uninstall        # everything: versions, packages, commands and the 
 | `--prefix <dir>` | install into `<dir>` instead of `~/.burn` |
 | `--toolchain <version>` | the Burn version to install first (default: the latest) |
 | `--from-source` | build Burn and burnup from source instead of downloading them |
-| `--install-rust` | install Rust with rustup when a source build needs it |
 | `--no-ash` | do not install ash |
 | `--no-modify-path` | do not touch your shell profile |
 
@@ -127,16 +126,14 @@ tar -xzf burn-linux-x86_64.tar.gz
 
 ## Manual installation
 
-Any platform with Rust can build the toolchain from a checkout:
+Linux and macOS, on x86-64 and arm64, can build the toolchain from a checkout with a C compiler, `tar` and `xz`:
 
 ```sh
 sh scripts/package.sh --prefix ~/.burn
 ```
 
-This builds bvm, lets bvm run the boot compiler in `compiler/boot` to compile the compiler written in Burn, lets that
-compiler build itself and the command
-line, and lays out `bin/` (`burn`, `burni`, `burnc` and `burn-lsp` are bvm, `burnfmt` is a script) and
-`share/burn/`. To do it by hand, copy `target/release/bvm` to `bin/bvm` and `bin/burn` (and to `burni`, `burnc`
-and `burn-lsp`, or link them), and put the command line module, built with
-`bvm compiler/boot/compiler.bvmc build compiler/src/bin/burn.bn -o burn.bvm`, at `share/burn/burn.bvm` next to `bin/`.
-`BURN_CLI_BVM` can point at it instead.
+This assembles the seed in `compiler/boot` (the compiler written in Burn, as assembly for this platform), lets it
+build the compiler from `compiler/src` until the compiler reproduces itself
+([how the compiler builds itself](../internals/toolchain.mdx#how-the-compiler-builds-itself)), builds `bin/burn` and
+the runtime libraries with it, and lays out `bin/` (`burni`, `burnc`, `burn-lsp` and `bvm` are links to `burn`,
+`burnfmt` is a script) and `share/burn/`. It takes under a minute.

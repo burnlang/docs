@@ -22,7 +22,7 @@ On any other system (Windows, 32-bit ARM, RISC-V), use `burn run`, bytecode (`--
 (`--target bar`) or JavaScript (`--target js`), which run everywhere bvm or Node.js runs.
 
 ```sh
-burn version                 # Burn 26.1.0-experimental-6
+burn version                 # Burn 26.1.0-experimental-7
 burnc app.bn                 # ./app for this computer
 file app                     # Mach-O 64-bit executable arm64, on an Apple silicon Mac
 burn dump --asm app.bn       # the assembly it was built from
@@ -33,9 +33,9 @@ burn dump --asm app.bn       # the assembly it was built from
 - **A C toolchain.** `cc` assembles the generated `.s` file and links the executable. On macOS, install the Xcode
   command line tools (`xcode-select --install`); on Linux, `gcc` or `clang` (`apt install build-essential`). Set
   `BURN_CC` (or `CC`) to use another one.
-- **The runtime.** Every toolchain ships it in `share/burn/lib`: `libburn_runtime.a` (bvm and the runtime core, so
-  executables can also run embedded bytecode libraries), `libburn_core.a` (the runtime without the standard library,
-  for [`--no-std`](./no-std.mdx)) and `native-libs.txt` (the system libraries the runtime needs).
+- **The runtime.** Every toolchain ships it in `share/burn/lib`: `libburn_runtime.a` (the runtime written in Burn),
+  `libburn_launcher.a` (bvm written in Burn, for executables that run bytecode) and `native-libs.txt` (the system
+  libraries the runtime needs).
 
 Nothing else is needed at run time: the executable only uses the C library of the system it runs on.
 
@@ -63,9 +63,8 @@ built for it, and `BURN_CC` at a linker for it. For example, from an x86-64 Linu
 
 ```sh
 sudo apt install gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-rustup target add aarch64-unknown-linux-gnu
 
-TARGET=aarch64-unknown-linux-gnu sh scripts/native-runtime.sh ~/burn-runtime-arm64
+TARGET=aarch64-unknown-linux-gnu BURN_CC=aarch64-linux-gnu-gcc sh scripts/native-runtime.sh ~/burn-runtime-arm64
 
 BURN_PLATFORM=linux-aarch64 \
 BURN_RUNTIME_DIR=~/burn-runtime-arm64 \
@@ -73,9 +72,9 @@ BURN_CC=aarch64-linux-gnu-gcc \
 burnc app.bn -o app-arm64
 ```
 
-`scripts/native-runtime.sh` is in the Burn repository; it compiles bvm's runtime with `rustc` for the Rust target
-you name (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu` or
-`x86_64-unknown-linux-gnu`). `BURN_PLATFORM` alone is enough to look at the generated code:
+`scripts/native-runtime.sh` is in the Burn repository; it compiles the runtime written in Burn (and bvm) with `burn`
+for the target you name (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu` or
+`x86_64-unknown-linux-gnu`) and assembles it with `BURN_CC`. `BURN_PLATFORM` alone is enough to look at the generated code:
 
 ```sh
 BURN_PLATFORM=macos-aarch64 burn dump --asm app.bn
@@ -86,7 +85,8 @@ Mac. To try an arm64 Linux executable on an x86-64 computer, run it with `qemu-a
 
 ## How it is tested
 
-The test suite (`cargo test`) builds every program in `tests/cases` natively and compares its output with bvm, also
-with a small cycle-collection threshold, without the standard library, and with bytecode libraries and mixins. CI
+The test suite (`sh scripts/test.sh`, written in Burn in `tests/run.bn`) builds every program in `tests/cases`
+natively and compares its output with bvm, also with a small cycle-collection threshold, with the JIT compiling
+everything, without the standard library, and with bytecode libraries and mixins. CI
 runs it on Linux x86-64 and on a Mac with Apple silicon. On Linux, the suite also cross-compiles every test program to
 arm64 and runs it under qemu.

@@ -1,19 +1,14 @@
 ---
 title: Building without the standard library
-description: Small native executables that use only the built-in core of the language, without the standard library.
+description: Programs that use only the built-in core of the language, without the standard library.
 order: 46
 ---
 
 # Building without the standard library
 
-Like `no_std` in Rust, a program can be built with only the core of the language: no standard library modules and none
-of the runtime behind them (threads for `async fun`, the HTTP client, JSON, processes, time zones and bytecode
-libraries). The checker rejects everything else, so such a program depends on nothing but the core runtime, and a
-native executable gets much smaller:
-
-| Program | With the standard library | Without |
-| --- | --- | --- |
-| `print("hello")` | 345 KB | 35 KB |
+A program can be built with only the core of the language: no standard library modules and none of the features
+behind them (threads for `async fun`, the HTTP client, JSON, processes, time zones and bytecode libraries). The
+checker rejects everything else, so such a program depends on nothing but the core of the language.
 
 ```sh
 burn build app.bn --no-std
@@ -66,7 +61,8 @@ on bvm, which makes no difference to what it prints.
 
 ## How it works
 
-The runtime crate is compiled twice. The full build uses Rust's standard library. The other one is `no_std`: it uses
-only `core` and `alloc`, takes memory from `malloc` and talks to the system through a few C library calls (`write`,
-`read`, `open`, `getenv`, `clock_gettime`, `nanosleep`). Both are embedded in the `burn` binary, and `burn build`
-links the one the program needs. The generated machine code is the same either way.
+The checker keeps the standard library out of the program and rejects the built-in features that need it, but a
+native executable links the same runtime written in Burn either way, and the linker drops the runtime code the
+program does not use (`--gc-sections`). Until `26.1.0-experimental-7` the runtime was written in Rust and `--no-std`
+linked a smaller build of it without Rust's standard library; now every program gets the small runtime, so hello world
+is about 220 KB with or without `--no-std`.

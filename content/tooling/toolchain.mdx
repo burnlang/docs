@@ -6,14 +6,15 @@ order: 35
 
 # The toolchain
 
-`burn` is bvm, the Burn virtual machine. Started as `burn`, `burni`, `burnc` or `burn-lsp` (links to it), it runs
-the command line written in Burn (`share/burn/burn.bvm`), which checks the name it was started with. `burnfmt` runs
-the formatter written in Burn, and `bvm` is the virtual machine on its own.
+`burn` is one native executable written in Burn, with the compiler and bvm, the Burn virtual machine, inside.
+Started as `burn`, `burni`, `burnc` or `burn-lsp` (links to it), it is the command line in that role; started as
+`bvm` (another link), it is the virtual machine on its own. `burnfmt` runs the formatter written in Burn.
 
 ## `burni`: the interpreter
 
 `burni` type-checks a program, compiles it to a [bvm](../bvm/overview.mdx) module in memory and runs it. There is
-no build step: a program starts in a few milliseconds. `burni` also runs `.bvm` and `.bvmc` files.
+no build step: a program starts in a few milliseconds, and code that runs often is compiled to machine code while it
+runs ([the JIT](../bvm/optimizing.mdx)). `burni` also runs `.bvm` and `.bvmc` files.
 
 ```sh
 burni app.bn                 # run a program
