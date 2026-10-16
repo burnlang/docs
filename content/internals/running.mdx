@@ -43,7 +43,7 @@ jump", or "load a local and read one of its fields". The interpreter is a loop o
 ## Compiling hot code
 
 bvm counts calls and loop turns per function. When a function gets hot (1000 calls or loop turns), the JIT compiles
-it to x86-64 machine code that keeps the interpreter's frame, so compiled and interpreted functions call each other
+it to machine code for the processor (x86-64 or arm64) that keeps the interpreter's frame, so compiled and interpreted functions call each other
 freely, and a loop that is already running continues in the compiled code at its next turn (on-stack replacement).
 Compiled code keeps values in registers and runs arithmetic, comparisons, fields, arrays and reference counting
 inline. See [the JIT](../bvm/optimizing.mdx) for the details and its settings, `BURN_JIT` and `BURN_JIT_THRESHOLD`.

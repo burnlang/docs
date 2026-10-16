@@ -28,7 +28,7 @@ What a language gets by targeting bvm:
   run off the end of a function.
 - **Fast execution.** Verified code runs on an interpreter with a precomputed frame size per function, so pushes
   and pops aren't bounds-checked. At load time common instruction sequences are fused into
-  superinstructions, and functions and loops that run often are compiled to x86-64 machine code while the program
+  superinstructions, and functions and loops that run often are compiled to x86-64 or arm64 machine code while the program
   runs (see [the JIT](./optimizing.mdx)).
 - **Two interchangeable file formats**: readable assembly (`.bvm`) and compact bytecode (`.bvmc`). They convert
   both ways without loss.
