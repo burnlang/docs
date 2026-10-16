@@ -1,6 +1,6 @@
 ---
 title: Native interop
-description: Bytecode libraries, the functions they share, and host functions that a Rust program gives them.
+description: Bytecode libraries, the functions they share, and host functions that the program running bvm gives them.
 order: 64
 ---
 
@@ -15,7 +15,7 @@ program (bytecode)                                bytecode library (.bvmc / .bar
 dist(a, b) ───── call ──────────────────────────▶ @Export dist(a: Point, b: Point): float
 @Export hostName() ◀── import ─────────────────── @Native fun hostName(): string
 @Inject(target: "describe") ── mixin ──────────▶ describe(p: Point): string   (rewritten)
-Rust host: host.register("log", 1, ...) ◀──────── @Native("log") fun log(s: string)
+host: HostFn { name: "log", argc: 1, ... } ◀──── @Native("log") fun log(s: string)
 ```
 
 ## The translation layer
@@ -33,7 +33,7 @@ Both sides describe the functions they share the same way:
 
 bvm resolves imports against exports whether the exporter is another module (in a linked program or an archive)
 or the program that embeds bvm. That makes a library portable: the same `.bvmc` runs under `bvm`, in a `.bar` and
-inside any Rust program that embeds bvm.
+inside any Burn program that embeds bvm.
 
 ## Using a library from Burn
 
@@ -83,24 +83,28 @@ The linker turns the call into a direct bytecode call. A library whose imports n
 with an error that names the missing function. Programs can also apply [mixins](./mixins.mdx) to the libraries
 they import.
 
-## Host functions from Rust
+## Host functions from Burn
 
-A Rust program that embeds bvm gives modules host functions with `Host::register`, by name and argument count;
-the module declares them with `@Native("name")` in Burn or `import name <argc>` in assembly:
+A Burn program that embeds bvm ([embedding bvm](./embedding.mdx)) gives modules host functions as `HostFn` values,
+by name and argument count; the module declares them with `@Native("name")` in Burn or `import name <argc>` in
+assembly. Arguments arrive as raw words, so a string is the address of its object, which `__str` turns back into a
+`string` in unsafe code:
 
-```rust
-let mut host = bvm::Host::new();
-host.register("log", 1, |args| {
-    println!("{}", bvm::runtime::obj::str_ref(args[0]));
-    0
-});
-let module = bvm::parse(&std::fs::read("app.bvmc")?)?;
-bvm::run(&module, &host, vec![])?;
+```burn
+var log = fun(args: [int]): int {
+    unsafe {
+        print("[plugin] " + __str(args[0]))
+    }
+    return 0
+}
+var prog = prepare(module, [HostFn { name: "log", argc: 1, call: log }])
+runEntry(prog)
 ```
 
-This is how the Burn toolchain itself works: `burn` is bvm running the command line written in Burn, which reaches
-bvm through host functions such as `burn.runModule`, `burn.library` and `burn.readMessage`.
+The Burn toolchain is built the same way: `burn` is the command line written in Burn with bvm compiled into it, so
+running a program means compiling it to a module and handing it to `prepare` and `runEntry` in the same process.
 
-Native executables use the same layer: a program built with `burnc app.bn` embeds the bytecode libraries it imports,
-and bvm, linked into the executable, runs them. The library's calls back into the program reach its native
-functions, and mixins in the program rewrite the library's bytecode as they do on bvm.
+Native executables use the same layer: a program built with `burnc app.bn` that imports bytecode libraries is
+compiled to bytecode, linked with its libraries and run by bvm, which is linked into the executable
+(`libburn_launcher.a`), so the library's calls back into the program and the program's mixins work exactly as they do
+on bvm.
