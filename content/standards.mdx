@@ -63,7 +63,7 @@ Burn itself and the toolchain released with it (the compiler, the standard libra
 `YY.RELEASE.PATCH`.
 
 ```text
-26.1.0-experimental-8
+26.1.0-experimental-9
 │  │ │ └─────┬──────┘
 │  │ │   pre-release
 │  │ └── patch: fixes to that release
@@ -75,7 +75,7 @@ Burn itself and the toolchain released with it (the compiler, the standard libra
   again at release `1`: `27.1.0`.
 - **The second number counts the releases of that year**, and the third the fixes to one release: `26.1.2` is the
   second fix of the first release of 2026.
-- **Pre-releases end in `-experimental-N`**, counting up from `1`, before the release is final: `26.1.0-experimental-8`
+- **Pre-releases end in `-experimental-N`**, counting up from `1`, before the release is final: `26.1.0-experimental-9`
   comes before `26.1.0`.
 - `burnup` also accepts short forms such as `26.1` and `^26.1`; see [installation](./tooling/installation.mdx).
 - Packages that move with the year, such as bindings that follow Burn's releases, can use yearly versions too.
@@ -96,6 +96,7 @@ Every release of Burn is tagged `v<version>` and listed in the
 | `26.1.0-experimental-6` | `v26.1.0-experimental-6` | modules: [import aliases](./language/modules.mdx#import-aliases) (`import "std/memory" as Mem`) and [imports inside functions and blocks](./language/modules.mdx#imports-inside-functions-and-blocks) |
 | `26.1.0-experimental-7` | `v26.1.0-experimental-7` | no Rust: bvm and the runtime are written in Burn, the toolchain is one native executable, and Burn builds from assembly seeds with only a C compiler; [calling C](./language/calling-c.mdx) with `@Extern` |
 | `26.1.0-experimental-8` | `v26.1.0-experimental-8` | [the JIT](./bvm/optimizing.mdx): bvm compiles hot code to x86-64 and arm64 machine code while it runs |
+| `26.1.0-experimental-9` | `v26.1.0-experimental-9` | editors explain [keywords and built-in types](./language/keywords.mdx) on hover; `ash init` asks step by step |
 | `26.1.0` | `v26.1.0` | the first stable release of 2026, after the experimental ones |
 | `26.2.0`, `26.3.0`, … | `v26.2.0`, … | the next releases of 2026; fixes to a release are `26.1.1`, `26.1.2`, … |
 | `27.1.0` | `v27.1.0` | the first release of 2027 |
