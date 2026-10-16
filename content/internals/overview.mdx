@@ -27,9 +27,8 @@ print(greet(who))
 
 Running `burn app.bn` goes through these steps:
 
-1. **bvm starts.** `burn` is the bvm executable under another name. Started as `burn`, it loads the command line,
-   which is written in Burn and shipped as bytecode in `share/burn/burn.bvm`
-   ([the toolchain](./toolchain.mdx)).
+1. **`burn` starts.** `burn` is one native executable that contains the command line, the compiler and bvm, all
+   written in Burn ([the toolchain](./toolchain.mdx)).
 2. **The command line loads the program.** It reads `app.bn`, finds the project around it (`burn.toml`), and follows
    every `import` to the standard library, the project's own modules and installed packages.
 3. **Lexer and parser.** Each file becomes tokens, then a syntax tree ([front end](./front-end.mdx)).
@@ -37,14 +36,14 @@ Running `burn app.bn` goes through these steps:
    the program is lowered to a small typed intermediate form, the IR.
 5. **Ownership.** A pass over the IR adds the reference counting that frees memory ([memory](./memory.mdx)).
 6. **Code generation.** The IR becomes a bvm module: bytecode, a type table, strings, source locations.
-7. **bvm runs it.** The module is linked with the runtime library, verified and run by the same bvm process; hot code
-   is optimized while it runs ([running on bvm](./running.mdx)).
+7. **bvm runs it.** The module is linked with the bytecode libraries it imports, verified and run by the bvm inside
+   the same process; hot code is compiled to machine code while it runs ([running on bvm](./running.mdx)).
 
 All of this happens in one process and usually takes a few milliseconds, which is why `burn app.bn` feels like an
 interpreter. `burn build` stops after step 5 and generates machine code instead
 ([native executables](./native.mdx)), or JavaScript with `--target js`.
 
-![The six steps of burn app.bn inside one bvm process](../images/run-burn.svg)
+![The six steps of burn app.bn inside one process](../images/run-burn.svg)
 
 ## Looking at every stage
 
@@ -103,13 +102,13 @@ rt print
 | lexer, parser, checker, ownership, code generators | Burn | `compiler/src/` |
 | the command line, REPL, formatter, `burn doc`, language server | Burn | `compiler/src/cli`, `lsp`, `doc`; `lib/tools` |
 | the standard library | Burn | `lib/std/`, embedded into the compiler |
-| runtime functions such as `split`, `trim`, `parseJSON` | Burn | `lib/runtime/`, compiled to `bvm/runtime.bvm` |
-| bvm: loader, verifier, linker, interpreter, optimizer | Rust | `bvm/src/` |
-| the runtime core: memory, strings, arrays, maps, files, HTTP, tasks | Rust | `bvm/runtime/src/` |
+| bvm: bytecode format, assembler, verifier, linker, mixins, archives, interpreter, JIT | Burn | `compiler/src/bvm/` |
+| the runtime: memory, strings, arrays, maps, printing, files, processes, JSON, HTTP, tasks | Burn | `lib/rt/` |
 | the JavaScript runtime | JavaScript | `lib/js/prelude.js` |
+| the seeds: the compiler and its runtime as assembly for each platform | assembly | `compiler/boot/` |
 
-Only bvm and the runtime core are written in Rust; everything that understands Burn is written in Burn and compiles
-itself.
+Everything is written in Burn and compiles itself. The toolchain only links the C library, and a C compiler assembles
+the seed for the very first build ([how the compiler builds itself](./toolchain.mdx#how-the-compiler-builds-itself)).
 
 ## Read on
 
@@ -117,7 +116,7 @@ itself.
 - [Values in memory](./values.mdx): how numbers, strings, arrays, maps, structs, enums, closures and `any` are stored,
   and how method calls find their code.
 - [Memory management](./memory.mdx): ownership, reference counting, the cycle collector and the heap limit.
-- [Running on bvm](./running.mdx): verifying, the interpreter, optimizing while running, runtime errors and threads.
+- [Running on bvm](./running.mdx): verifying, the interpreter, the JIT, runtime errors and threads.
 - [Native executables](./native.mdx): the generated machine code, calling conventions and linking.
 - [The toolchain](./toolchain.mdx): how `burn` starts, where the standard library and packages live, and how the
   compiler builds itself.
