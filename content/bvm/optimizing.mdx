@@ -1,66 +1,69 @@
 ---
-title: Optimizing while running
-description: How bvm loads only the code a program uses and speeds up hot code while the program runs.
+title: The JIT
+description: How bvm compiles the functions and loops a program spends its time in to machine code while it runs.
 order: 65
 ---
 
-# Optimizing while running
+# The JIT
 
-bvm gets faster as a program runs. It never works on code the program doesn't use, and it re-optimizes
-the functions the program spends its time in, while the program keeps running. There is nothing to
-configure and no cache on disk. It works for every language built on bvm, not just Burn.
+bvm gets faster as a program runs. It starts every function in the interpreter, counts how often each one is called
+and how often its loops turn, and compiles the hot ones to x86-64 machine code while the program keeps running. There
+is nothing to configure and no cache on disk, and it works for every language built on bvm, not just Burn.
 
-![Functions are prepared on first call and rebuilt when hot](../images/tiering.svg)
+![Functions start in the interpreter and are compiled to machine code when they get hot](../images/tiering.svg)
 
-## Tier 0: only what runs
+## Preparing: the interpreter
 
-When a module is loaded, bvm verifies it but doesn't prepare any function. A function is prepared the
-first time it is called: its jumps are resolved and common instruction sequences are fused into
-superinstructions. A function that is never called is never prepared and costs nothing, so unused code in
-large libraries and archives is dropped for free.
+When a module is loaded, bvm verifies it and prepares every function once: each instruction becomes a fixed-size
+record of 32 bytes in memory, with its jump target, the function it calls, its string or its runtime function already
+resolved to an address, so nothing is looked up while the program runs. Common sequences are fused into single
+records, such as "add a constant to a local" (`i += 1`), "compare two locals and jump", "load a local and a constant"
+or "load a local and read one of its fields". The interpreter is a loop over these records, with the locals of a call
+and its operand stack next to each other in one block of memory.
 
-## Tier 1: hot code gets rebuilt
+## Compiling: hot code becomes machine code
 
-bvm counts how often each function is called and how often its loops go round. When a function becomes
-hot (1000 calls, or about 16,000 loop iterations), bvm rebuilds it:
+Each function counts its calls and the backward jumps of its loops. At 1000 the interpreter hands the function to the
+JIT, which writes machine code for it from the prepared records into memory it maps executable:
 
-- **Inlining.** Calls to small functions without loops or further calls, such as getters, setters and
-  one-line helpers, are replaced by the function's body. `p.get()` becomes a direct field read.
-- **Constant folding.** Arithmetic and comparisons on constants are computed once, and branches on
-  constants become plain jumps or disappear.
-- **Dead code removal.** Instructions that can no longer run, values that are computed and thrown away,
-  and temporaries nobody reads are removed.
-- **Peephole rules.** For example `store x; load x` becomes `tee x`, and `not; jz` becomes `jnz`.
-- **Self calls.** A recursive call to the same function skips the function lookup.
-- **Superinstructions** are fused again over the new code.
+- **The same frame.** Compiled code keeps the interpreter's layout: the locals of a call and its operand stack at a
+  fixed place, each stack slot at a fixed offset. Interpreted and compiled functions call each other freely, in any
+  order, and a call to a compiled function from compiled code is a plain machine `call`.
+- **On-stack replacement.** A loop that gets hot in the middle of a call, such as a long loop in `main`, does not wait
+  for the next call: the interpreter jumps into the compiled code at the same instruction and the loop goes on there.
+- **Values in registers.** While it compiles, the JIT tracks what each operand stack slot holds: a constant, the value
+  of a local, or the value in a register. It writes a value to memory only where a jump, a call or a jump target needs
+  it there, so `total += i % 7` is a handful of register instructions.
+- **Inline fast paths.** Integer arithmetic with its overflow checks, comparisons fused with the branch after them,
+  division, fields, array reads and writes, `len` and reference counting are machine instructions. They call the
+  runtime only for their rare cases: a division by 0, an index out of bounds, an object that dies, values shared
+  between threads.
+- **Everything else** runs the same function the interpreter uses for it, so compiled code never behaves
+  differently.
 
-The rebuilt code replaces the old version for all later calls. A loop that is already running switches
-to the new code at its next iteration (on-stack replacement), so even a long loop in `main` gets faster
-without being called again. Threads started with `async` share the optimized code.
+Runtime errors, `exit`, the REPL's recovery from errors and stack overflows behave the same in compiled code: the
+error names the same line and column. Threads started with `async` share the compiled code.
 
-## Seeing it work
+## Settings
 
-Set `BVM_STATS` to get a summary when the program ends:
+| Variable | Does |
+| --- | --- |
+| `BURN_JIT=0` | turns the JIT off; everything is interpreted |
+| `BURN_JIT_THRESHOLD=<n>` | how many calls or loop turns make a function hot (default 1000); `1` compiles every function on its first call |
 
-```sh
-BVM_STATS=1 burn app.bn
-```
+The results are always the same; only the speed changes. Burn's test suite runs every test program with
+`BURN_JIT_THRESHOLD=1` and with `BURN_JIT=0` and compares their output with the native executables.
 
-```text
-[bvm] 7 of 9 functions ran (2 never loaded); 5 optimized while running: 2 calls inlined, 0 constants folded, 8 instructions removed, 1 loops switched to optimized code
-```
-
-`BVM_HOT` changes when code counts as hot: `BVM_HOT=1` optimizes every function on its first call, and
-`BVM_HOT=0` turns tier 1 off. The results are always the same; only the speed changes. Burn's test suite
-runs every program with `BVM_HOT=1` to make sure of that.
+The JIT runs on x86-64 Linux and macOS. On arm64 (Apple silicon and Linux), bvm interprets for now.
 
 ## Numbers
 
-Instructions executed, measured with callgrind, before and after this feature:
+| Program | Interpreted | With the JIT | Native executable |
+| --- | --- | --- | --- |
+| `fib(32)`, recursive calls | 1.4 s | 31 ms | 20 ms |
+| a loop with `%` over 50 million numbers | 4.6 s | 0.17 s | 0.17 s |
+| 30 million loop turns at the top level | 3.7 s | 0.05 s | 0.08 s |
+| a sieve of Eratosthenes over arrays | 6.0 s | 0.9 s | 0.75 s |
+| structs created and read in a loop | 2.2 s | 0.86 s | 0.77 s |
 
-| Program | Before | After |
-| --- | --- | --- |
-| `fib(27)`, recursive calls | 115.5M | 103.4M (−10%) |
-| interface calls, getters, small helpers | 2.09G | 1.35G (−35%) |
-| arithmetic helpers and a method in a loop | 4.05G | 3.22G (−20%) |
-| a plain loop over globals | 765M | 781M (+2%) |
+The times include starting `burn`, compiling the program to bytecode and compiling it to machine code.

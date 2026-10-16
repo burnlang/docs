@@ -1,111 +1,140 @@
 ---
 title: Embedding bvm
-description: Building, loading and running bvm modules from Rust, host functions and the bytecode format.
+description: Building, saving, loading and running bvm modules from a Burn program, host functions and the bytecode format.
 order: 59
 ---
 
 # Embedding bvm
 
-The `bvm` crate is a library as well as a command. Add it to a Rust project with a path or git dependency:
+bvm is written in Burn, in `compiler/src/bvm/` of the [Burn repository](https://github.com/burnlang/burn), and its
+parts are ordinary Burn modules. A Burn program that imports them can build bvm modules, write and read them, link
+them and run them in its own process, with functions of its own that the bytecode calls. The `bvm` command, the Burn
+command line and [Ember](./new-language.mdx) all work this way.
 
-```toml
-[dependencies]
-bvm = { git = "https://github.com/burnlang/burn" }
-```
-
-## Generating code
-
-`ModuleBuilder` collects functions, strings, globals, types, imports and dispatch tables. `FuncBuilder` emits
-instructions and handles jump labels for you.
-
-```rust
-use bvm::{Cmp, FuncBuilder, ModuleBuilder, Op, RtFn};
-
-let mut mb = ModuleBuilder::new();
-
-let fact = mb.declare("fact", 1);            // declare first so it can call itself
-let mut f = FuncBuilder::with_params(&["n"]);
-let base = f.label();
-f.load(0).int(1).icmp(Cmp::Le).jnz(base);
-f.load(0).load(0).int(1).emit(Op::ISub).call(fact).emit(Op::IMul).ret();
-f.bind(base).int(1).ret();
-mb.define(fact, f);
-
-let mut main = FuncBuilder::new(0);
-main.int(10).call(fact).int(3).rt(RtFn::ToStr).rt(RtFn::Print).ret_void();
-let main = mb.function("main", main);
-mb.entry(main);
-
-let module = mb.finish();
-```
-
-Useful builder calls:
-
-| Call | Does |
+| Module | Gives |
 | --- | --- |
-| `mb.string(s)` | interns a string and returns its index for `Op::Str` |
-| `mb.global(name)` | adds a global and returns its index |
-| `mb.import(name, argc)` | declares a host function for `Op::Host` |
-| `mb.ty(desc)` / `mb.new_type(desc)` | interns / appends a type descriptor and returns its id |
-| `mb.table(name, argc)` + `mb.table_entry(t, tid, f)` | builds a dispatch table |
-| `mb.loc("file:line")` | adds a source location for error messages |
-| `f.local(name)` | adds a local and returns its slot |
-| `f.label()`, `f.bind(l)`, `f.here()` | creates, places and creates-and-places labels |
-| `f.jmp(l)`, `f.jz(l)`, `f.jnz(l)`, `f.jz_keep(l)`, `f.jnz_keep(l)` | jumps to labels |
-| `f.reachable_end()` | true if execution can reach the current end, so you know whether to append `ret_void` |
+| `compiler/src/vm/module.bn` | the module types: `VModule`, `VFunc`, `Op`, `Desc`, `Import`, `Table`, `Sig`, annotations |
+| `compiler/src/bvm/binary.bn` | `emptyModule()`, `encode(module)` and `decode(bytes)`: `.bvmc` bytecode |
+| `compiler/src/vm/asm.bn` | `disassemble(module)`: `.bvm` assembly text |
+| `compiler/src/bvm/assemble.bn` | `assemble(text)`: a module from assembly, with the line of the first error |
+| `compiler/src/bvm/verify.bn` | `analyze(module)`: the verifier, with the deepest stack of each function |
+| `compiler/src/bvm/link.bn` | `link(modules, allowUnresolved, skipMixins)`: the [linker](./linking.mdx) and [mixins](./mixins.mdx) |
+| `compiler/src/bvm/archive.bn` | `decodeArchive`, `encodeArchive`, `linkArchive`: [archives](./archives.mdx) |
+| `compiler/src/bvm/interp.bn` | `prepare`, `runEntry`, `call`: the interpreter and the [JIT](./optimizing.mdx) |
+| `compiler/src/bvm/files.bn` | `readBytes(path)` and `writeBytes(path, bytes)` |
 
-A `Module` is plain data (`types`, `strings`, `globals`, `imports`, `funcs`, `tables`, `locs`, `entry`), so a front
-end can also build one directly.
+bvm calls the C library and the runtime directly (through [`@Extern`](../language/calling-c.mdx)), so a program that
+embeds it is built as a native executable: `burn build host.bn -o host`.
 
-## Checking, saving and loading
+## Building a module
 
-```rust
-bvm::verify(&module)?;                                // structural checks
-let text = bvm::asm::disassemble(&module);            // .bvm
-let bytes = bvm::binary::encode(&module);             // .bvmc
-let again = bvm::binary::decode(&bytes)?;             // back to a Module
-let parsed = bvm::asm::assemble(&text)?;              // from text
-let from_disk = bvm::read(std::path::Path::new("app.bvmc"))?;   // either format
+A `VModule` is plain data: types, strings, source locations, globals, imports, functions, dispatch tables,
+annotations and the entry function. `emptyModule()` starts one with the built-in types (`3` is `int`, `6` is
+`string`, see [values and the runtime library](./runtime.mdx)). A function is a `VFunc` whose code is a list of `Op`
+values; jumps name the index of the instruction they go to.
+
+```burn
+import "burn/compiler/src/bvm/binary.bn"
+import "burn/compiler/src/bvm/files.bn"
+import "burn/compiler/src/bvm/interp.bn"
+import "burn/compiler/src/vm/asm.bn"
+import "burn/compiler/src/vm/module.bn"
+import "burn/compiler/src/check/hir.bn"
+import "std/process"
+
+fun main() {
+    var m = emptyModule()
+    m.imports.push(Import { name: "square", argc: 1 })
+    var fact = VFunc {
+        name: "fact",
+        params: 1,
+        locals: 1,
+        names: ["n"],
+        code: [
+            Op.Load(0), Op.Const(1), Op.ICmp(Cmp.Le), Op.Jnz(11),
+            Op.Load(0), Op.Load(0), Op.Const(1), Op.ISub, Op.Call(0), Op.IMul, Op.Ret,
+            Op.Const(1), Op.Ret
+        ],
+        external: false,
+        sig: null
+    }
+    var main = VFunc {
+        name: "main",
+        params: 0,
+        locals: 0,
+        names: [],
+        code: [
+            Op.Const(10), Op.Call(0), Op.Host(0), Op.Const(3), Op.Rt("ToStr"), Op.Rt("Print"), Op.Pop,
+            Op.RetVoid
+        ],
+        external: false,
+        sig: null
+    }
+    m.funcs = [fact, main]
+    m.entry = 1
+
+    print(disassemble(m))
+    writeBytes("fact.bvmc", encode(m))
+
+    var square = fun(args: [int]): int {
+        return args[0] * args[0]
+    }
+    var prog = prepare(m, [HostFn { name: "square", argc: 1, call: square }])
+    if (prog.error != "") {
+        eprint(prog.error)
+        exit(1)
+    }
+    runEntry(prog)
+    print(call(prog, 0, [5]))
+}
 ```
 
-## Linking and archives
+With the repository checked out next to it as `burn/`:
 
-```rust
-let program = bvm::link(&[app, library])?;              // resolve externs, apply mixins
-let archive = bvm::archive::Archive::decode(&bytes)?;    // a .bar file
-let (module, host) = bvm::load_bytes(&bytes)?;           // a module or an archive, linked, with its host
-let code = bvm::run_file(std::path::Path::new("app.bar"), vec![])?;
+```sh
+burn build host.bn -o host && ./host
 ```
 
-See [modules and linking](./linking.mdx), [archives](./archives.mdx) and [mixins](./mixins.mdx).
+```text
+; bvm module, format 2
+import square 1
 
-## Running with host functions
+entry main
 
-```rust
-use bvm::{Host, Runner};
-
-let mut host = Host::new();
-host.register("square", 1, |args| (args[0] as i64 * args[0] as i64) as u64);
-
-// run the entry function and wait for spawned threads
-bvm::run(&module, &host, Vec::new())?;
-
-// or keep control: call functions yourself and read globals afterwards
-let program = bvm::load(&module, &host)?;          // verifies, links and fuses
-let mut runner = Runner::new(program.clone(), Vec::new());
-let fact = program.func("fact").unwrap();
-assert_eq!(runner.call_with(fact, &[5]), 120);
-let globals = runner.finish();
+func fact(n)
+    load n
+    ...
+13168189440000
+120
 ```
 
-`load` fails with a `LoadError` if the module doesn't verify, imports a function the host doesn't provide, or
-imports it with a different argument count. Host functions receive their arguments as raw words and return one
-word. The runtime helpers in `bvm::runtime::obj` (`string`, `str_ref`, `array_new`, `field`, ...) read and create
-heap values. A host function may allocate: the arguments stay on the VM stack, so the collector can see them.
+`disassemble` prints the module as [assembly](./assembly.mdx), `encode` turns it into `.bvmc` bytecode, and `prepare`
+verifies, links and prepares it to run. `runEntry` runs the entry function, waits for the tasks it started and writes
+out what it printed; `call(prog, f, args)` calls function `f` with arguments and gives its result.
 
-Runtime errors print a message and exit the process by default. Call
-`bvm::runtime::io::set_panic_mode(true)` to turn them into panics that carry `bvm::runtime::io::BurnError`, which
-you can catch with `std::panic::catch_unwind`. Burn's REPL does this.
+## Reading modules
+
+```burn
+var d = decode(readBytes("app.bvmc") ?? [])
+var a = assemble(readFile("app.bvm"))
+var linked = link([d.module, a.module], false, false)
+var check = analyze(linked.module)
+```
+
+Every function that can fail gives a value with an `error` text, empty when it worked, instead of stopping the
+program, so a host can report problems its own way: `d.error`, `a.error` (at line `a.line`), `linked.error` and
+`check.error`, which is empty when the module verifies.
+
+## Host functions
+
+A `HostFn` names a function the bytecode imports, the number of arguments it takes and the Burn function that runs it.
+Its arguments come as raw 64-bit words, and it returns one: numbers as they are, strings and other objects as the
+address of their heap object. `prepare` fails with an error when the module imports a function the host does not
+provide, or imports it with a different number of arguments. Burn code declares host functions with
+`@Native("name")` ([native interop](./native-interop.mdx)), and assembly with `import name <argc>`.
+
+`programGlobals(prog)` and `setProgramGlobals(prog, values)` read and set the globals of a prepared program, which is
+how the REPL keeps a session's variables between inputs.
 
 ## The bytecode format
 
