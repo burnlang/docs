@@ -28,7 +28,29 @@ burn init github.com/you/hello --target js     # an app that builds to JavaScrip
 burn init github.com/you/colors --lib          # a library
 ```
 
-`ash init` does the same. An app gets `src/main.bn`, a library gets `src/lib.bn` and a test in `tests/main.bn`.
+`ash init <name>` does the same. `ash init` without a name asks step by step instead, with a suggestion for every
+answer: the package name (from your git user and the folder), whether to create an app, a library or a workspace,
+what an app builds to, the directory and whether to create a git repository. It shows what it will create and asks
+before creating it:
+
+```text
+$ ash init
+Create a new Burn project
+? Package name (github.com/you/my-project)
+? What do you want to create?
+  › 1 app       a program you run
+    2 lib       a package others import
+    3 workspace a shared library and one app per target
+? What should `ash build` make?
+  › 1 native    an executable for this computer
+    2 js        a JavaScript file for Node.js
+    3 bvm       portable bytecode (.bvmc)
+    4 bar       a runnable archive (.bar)
+? Directory (my-project)
+? Create a git repository? (Y/n)
+```
+
+An app gets `src/main.bn`, a library gets `src/lib.bn` and a test in `tests/main.bn`.
 Both get a `burn.toml`, a `.gitignore`, a `README.md` and a git repository (skip it with `--no-git`). Pass a
 directory after the name to create the project somewhere else, or `.` for the current folder.
 
