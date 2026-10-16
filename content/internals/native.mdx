@@ -101,10 +101,12 @@ bs_1:
 
 ## The trampoline
 
-The runtime, written in Rust, sometimes has to call a Burn function: to start an async task, or when a bytecode
-library calls back into the program. Burn functions take their arguments on the stack, which a Rust function cannot
-set up, so every executable contains a short hand-written function, `burn_call_trampoline(f, args, n)`, that pushes
-the `n` arguments and calls `f`. The runtime calls Burn code only through it.
+The runtime sometimes has to call a Burn function of the program: to start an async task, or to run a closure that
+was passed to it. Burn functions take their arguments on the stack, which a function with the C calling convention
+cannot set up, so every executable contains a short generated function, `burn_call_trampoline(f, args, n)`, that
+pushes the `n` arguments and calls `f`. The runtime calls the program's code only through it. (Functions marked
+[`@Extern`](../language/calling-c.mdx) are different: they take their arguments the C way, so C can call them
+directly.)
 
 ## Inline assembly
 
@@ -118,21 +120,23 @@ caller-saved registers freely.
 
 The generated assembly is linked by the C compiler (`cc`, or `BURN_CC`/`CC`) with:
 
-- `libburn_runtime.a`, a static build of bvm and its runtime core, so the executable needs no Burn installation;
+- `libburn_runtime.a`, the runtime written in Burn (`lib/rt`), compiled to native code, so the executable needs no
+  Burn installation;
 - the system libraries listed in `native-libs.txt` next to it (the C library, threads, math);
-- for `--no-std` programs, `libburn_core.a` instead, the runtime core built without Rust's standard library, which
-  is why such programs are much smaller.
+- for programs that run bytecode, `libburn_launcher.a`, bvm written in Burn (see below).
 
-Both libraries are built by `scripts/native-runtime.sh` and shipped in `share/burn/lib`. The executable is stripped
-unless `--no-strip` is given. A small program comes out at around 430 KB on x86-64 Linux, about 130 KB with
-`--no-std`.
+The libraries are built by `scripts/native-runtime.sh` with the toolchain's own `burn` and shipped in
+`share/burn/lib`. Every function is in a section of its own on Linux, so the linker drops the code nothing uses
+(`--gc-sections`). The executable is stripped unless `--no-strip` is given. Hello world comes out at about 220 KB on
+x86-64 Linux.
 
 ## Bytecode inside native executables
 
-A program that imports bytecode libraries (`.bvmc`) embeds them in the executable, and the bvm inside the runtime
-library loads them at startup. Calls between the native code and the bytecode go through `burn_bvm_call` and the
-trampoline; the program's `@Export` functions are registered so the bytecode can call them, and the libraries'
-mixins are applied as usual. `burn build app.bar` makes an executable that only contains bvm and the archive.
+A program that imports bytecode libraries (`.bvmc`) is compiled to bytecode instead, linked with its libraries and
+embedded in an executable together with bvm (`libburn_launcher.a`, built from `compiler/src/bin/launcher.bn`), which
+runs it at startup. The program therefore behaves exactly as on bvm, mixins included, and its hot code is compiled
+by [the JIT](../bvm/optimizing.mdx). `burn build app.bar` (or `.bvm`, `.bvmc`) makes such an executable from
+bytecode directly.
 
 ## Cross-compiling
 
@@ -142,7 +146,6 @@ Code generation only depends on the target platform, which `BURN_PLATFORM` selec
 
 ## Stack overflow
 
-On Linux x86-64, the runtime catches a stack overflow with a signal handler running on its own small stack and prints
-`runtime error: stack overflow (recursion is too deep)` before exiting with `1`. On other platforms the operating
-system stops a native program that runs out of stack; programs that recurse very deeply should run on bvm there, or
-use a loop.
+The runtime catches a stack overflow with a signal handler running on its own small stack and prints
+`runtime error: stack overflow (recursion is too deep)` before exiting with `1`, on Linux and macOS, x86-64 and
+arm64.

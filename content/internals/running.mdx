@@ -1,25 +1,24 @@
 ---
 title: Running on bvm
-description: How bvm links, verifies and interprets a Burn program, optimizes it while it runs, reports runtime errors and runs async tasks.
+description: How bvm links, verifies and interprets a Burn program, compiles hot code to machine code, reports runtime errors and runs async tasks.
 order: 52
 ---
 
 # Running on bvm
 
 `burn app.bn`, `burn run` and `burni` run programs on bvm, the Burn virtual machine. bvm is a general-purpose stack
-machine written in Rust ([bvm overview](../bvm/overview.mdx)); this page follows a Burn program through it.
+machine written in Burn ([bvm overview](../bvm/overview.mdx)), compiled into the `burn` executable; this page follows
+a Burn program through it.
 
-## Linking the runtime library
+## Linking
 
-The compiler's module contains only the program. Many runtime functions, such as `split`, `trim`, `contains`,
-`parseJSON` or `toInt`, are written in Burn in `lib/runtime/` and compiled to bvm assembly, `bvm/runtime.bvm`, which
-is built into the bvm executable. When a module is marked as a Burn program (`@RefCounted` in its assembly), bvm links
-it with that library, so the program's `rt split` instructions call the Burn implementations. The rest of the runtime
-(memory, strings, arrays, maps, formatting, files, processes, HTTP, time, tasks) is Rust code in `bvm/runtime/src`,
-called directly by the `rt` instruction.
+The compiler's module contains only the program. Its `rt` instructions name runtime functions, such as `split`,
+`trim`, `contains`, `parseJSON` or `toInt`; when the module is prepared, each one is resolved to the address of the
+function in the runtime written in Burn (`lib/rt/`), which is compiled into the toolchain, so an `rt` instruction is a
+direct call.
 
-Bytecode libraries imported by the program (`.bvmc`) are linked in the same step: functions are matched by name,
-dispatch tables with the same name are merged, and [mixins](../bvm/mixins.mdx) are applied to their targets.
+Bytecode libraries imported by the program (`.bvmc`) are linked first: functions are matched by name, dispatch tables
+with the same name are merged, and [mixins](../bvm/mixins.mdx) are applied to their targets.
 
 ## Verifying
 
@@ -32,25 +31,24 @@ checks while running.
 
 ## The interpreter
 
-Each call gets a frame with its locals; values are 64-bit words on an operand stack. The interpreter is a loop over
-the function's instructions, with the stack pointer and instruction pointer kept in registers. Instructions are small
+Each call gets a frame with its locals, followed by its operand stack; values are 64-bit words. Instructions are small
 and typed (`iadd`, `fadd`, `getfield`, `index`, `call`, `dispatch`, `rt`), so most do one thing without looking at
 types.
 
-Functions are prepared lazily. The first call of a function resolves its jumps and fuses common sequences into
-superinstructions, such as "add a constant to a local" (`i += 1`), "compare two locals and jump", or "load a local
-and read one of its fields". A function that
-never runs is never prepared, which is why a large program or library starts as fast as a small one.
+Before the program starts, every function is prepared once: each instruction becomes a fixed-size record in memory,
+with its jump target, called function, string or runtime function already resolved to an address, and common
+sequences are fused into superinstructions, such as "add a constant to a local" (`i += 1`), "compare two locals and
+jump", or "load a local and read one of its fields". The interpreter is a loop over these records.
 
-## Optimizing while running
+## Compiling hot code
 
-bvm counts calls and loop iterations per function. When a function gets hot (1000 calls or about 16,000 loop
-iterations) it is rebuilt: small functions such as getters are inlined into their callers, constants are folded,
-dead code and unused temporaries are removed, peephole rules simplify sequences, and superinstructions are fused again
-over the result. A loop that is already running switches to the new code at its next iteration. See
-[optimizing while running](../bvm/optimizing.mdx) for the details and how to watch it with `BVM_STATS=1`.
+bvm counts calls and loop turns per function. When a function gets hot (1000 calls or loop turns), the JIT compiles
+it to x86-64 machine code that keeps the interpreter's frame, so compiled and interpreted functions call each other
+freely, and a loop that is already running continues in the compiled code at its next turn (on-stack replacement).
+Compiled code keeps values in registers and runs arithmetic, comparisons, fields, arrays and reference counting
+inline. See [the JIT](../bvm/optimizing.mdx) for the details and its settings, `BURN_JIT` and `BURN_JIT_THRESHOLD`.
 
-![Functions are prepared on first call and rebuilt when hot](../images/tiering.svg)
+![Functions start in the interpreter and are compiled to machine code when they get hot](../images/tiering.svg)
 
 ## Runtime errors
 
@@ -70,13 +68,14 @@ runtime error: index 5 out of bounds (length 1)
 Then it flushes the program's output and exits with code `1`. When the source file is no longer there (for example
 a `.bvmc` copied elsewhere), the location line is printed without the snippet.
 
-Deep recursion is caught too: bvm keeps its frames in its own memory and stops a program that goes deeper than a
-million calls with `runtime error: stack overflow (recursion is too deep)`.
+Deep recursion is caught too: bvm keeps its frames in its own memory and stops a program that goes deeper than about
+a million calls with `runtime error: stack overflow (recursion is too deep)`. Compiled code also uses the machine
+stack, so a compiled function stops with the same error once its calls use 4 MB of it.
 
 ## Async tasks
 
-`spawn` starts an async call on a new operating system thread with a 64 MB stack and returns a future; the threads
-share the program's code, including code that has already been optimized. `await` blocks until the task has stored its
+`spawn` starts an async call on a new operating system thread and returns a future; each task gets an interpreter of
+its own, and the threads share the program's code, including code that has already been compiled. `await` blocks until the task has stored its
 result. While tasks run, reference counting switches to atomic operations
 ([memory management](./memory.mdx#async-tasks-and-threads)). A runtime error in a task stops the whole program like
 one in the main thread. When the main program ends, bvm waits for the tasks that are still running, then exits.
@@ -93,6 +92,6 @@ a runtime error is printed and at exit, so output always appears in order and co
 ## Host functions
 
 A program that bvm runs inside another program can call functions the host provides, declared in Burn with
-`@Native("name")` ([native interop](../bvm/native-interop.mdx)). The Burn command line itself is such a program: it
-calls host functions to compile, link and run the code it produced, without starting a new process
+`@Native("name")` ([native interop](../bvm/native-interop.mdx)). The Burn command line does not need them: it has bvm
+compiled in, so it compiles a program to a module and runs it by calling bvm directly, without starting a new process
 ([the toolchain](./toolchain.mdx)).
