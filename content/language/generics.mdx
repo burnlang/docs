@@ -83,6 +83,72 @@ print(s.pop(), s.pop(), s.pop())
 - Values print with their type arguments: `Pair<string, int> { first: "one", second: 1 }`.
 - A generic struct can implement interfaces, and then works wherever the interface is expected.
 
+## Generic methods
+
+A method can have type parameters of its own, in a generic struct or an ordinary one, static or not. Like a generic
+function, it gets its types from the arguments or from the type the result is assigned to:
+
+```burn
+def struct Box<T>(value: T) {
+    fun map<U>(f: fun(T): U): Box<U> {
+        return new Box<U>(f(value))
+    }
+}
+
+def struct Tools {
+    static fun firstOf<T>(xs: [T]): T {
+        return xs[0]
+    }
+}
+
+var b = new Box<int>(2)
+print(b.map(fun(x: int): string {
+    return "v" + str(x)
+}).value)                          // v2
+print(Tools.firstOf(["a", "b"]))   // a
+```
+
+Generic methods are inherited by structs that extend the struct, and inside the struct they can be called without
+`self`. `init` cannot have type parameters.
+
+## Generic interfaces
+
+An interface can have type parameters. Each instance, such as `Shows<int>`, is an interface type of its own; a struct
+implements an instance with `::`, and a generic struct can implement one with its own parameter:
+
+```burn
+def interface Shows<T> {
+    fun show(x: T): string
+}
+
+def struct IntShow :: Shows<int> {
+    fun show(x: int): string {
+        return "#" + str(x)
+    }
+}
+
+def struct Echo<T>(tag: string) :: Shows<T> {
+    fun show(x: T): string {
+        return "${tag}:${x}"
+    }
+}
+
+fun showAll<T>(s: Shows<T>, xs: [T]): [string] {
+    [string] out = []
+    for x in xs {
+        out.push(s.show(x))
+    }
+    return out
+}
+
+Shows<int> s = new IntShow()
+print(s.show(3))                                // #3
+print(showAll(new Echo<float>("f"), [0.5]))     // ["f:0.5"]
+```
+
+`showAll` gets `T` from the interface instance it is given. Writing `:: Shows` without type arguments is an error
+that suggests one.
+
 ## What a type parameter can do
 
 There are no constraints to declare. A type parameter can be used in any way that every type it is actually used
@@ -130,8 +196,7 @@ types. This is what C++ and Rust do, and it means:
 
 ## Limits
 
-- Methods cannot have their own type parameters; only the struct's parameters can be used in them. Write a generic
-  function outside the struct instead and call it with [method syntax](./functions.mdx#method-syntax).
 - Generic structs cannot extend another struct, and cannot have static members.
-- Enums, interfaces and type aliases (`def type Name = ...`) cannot take type parameters.
-- Type arguments cannot be written on a function call (`first<int>(xs)`); give the argument a type instead.
+- Enums and type aliases (`def type Name = ...`) cannot take type parameters.
+- Type arguments cannot be written on a function or method call (`first<int>(xs)`); give the argument or the result a
+  type instead.
