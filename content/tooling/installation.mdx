@@ -36,7 +36,7 @@ See [the toolchain](./toolchain.mdx) for what each command does.
 
 ## Requirements
 
-- Linux or macOS (Windows: see [manual installation](#manual-installation))
+- Linux or macOS (Windows: see [Windows](#windows))
 - `git`, which burnup and ash use to download Burn versions and packages
 - A C compiler (`cc`), `tar` and `xz` for versions built from source (branches such as `master`, and any version
   without a prebuilt release): the C compiler assembles the seed that comes with the sources, which builds the rest.
@@ -123,6 +123,22 @@ and burnup downloads them. To unpack one by hand:
 tar -xzf burn-linux-x86_64.tar.gz
 ./burn/bin/burn version
 ```
+
+## Windows
+
+Each release has `burn-windows-x86_64.zip`. Unzip it, for example to `%LOCALAPPDATA%\Programs\burn`, and add its
+`bin` folder to `PATH`:
+
+```powershell
+Expand-Archive burn-windows-x86_64.zip "$env:LOCALAPPDATA\Programs"
+[Environment]::SetEnvironmentVariable("Path", "$env:Path;$env:LOCALAPPDATA\Programs\burn\bin", "User")
+```
+
+`burn.exe`, `burni.exe`, `burnc.exe`, `burn-lsp.exe`, `bvm.exe` and `burnfmt.cmd` then work like on the other
+systems. Building native executables needs `gcc` from MinGW-w64, such as [MSYS2](https://www.msys2.org/)
+(`pacman -S mingw-w64-ucrt-x86_64-gcc`) or [w64devkit](https://github.com/skeeto/w64devkit), on `PATH`; everything
+else works without it. The Windows toolchain is built from Linux with `scripts/package-windows.sh`
+([cross-compiling](./cross-compiling.mdx#cross-compiling)).
 
 ## Manual installation
 

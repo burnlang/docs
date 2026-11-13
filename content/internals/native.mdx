@@ -7,7 +7,7 @@ order: 53
 # Native executables
 
 `burn build` (and `burnc`) turns a program into a standalone executable for the machine: x86-64 or 64-bit ARM, on
-Linux or macOS. It starts from the same IR as bvm, after the [ownership pass](./memory.mdx), and generates assembly
+Linux or macOS, and x86-64 on Windows. It starts from the same IR as bvm, after the [ownership pass](./memory.mdx), and generates assembly
 text that the system's C compiler assembles and links. A large program's assembly is cut into pieces of about 150000
 lines at function boundaries, which are assembled in parallel on every core and linked together.
 
@@ -149,8 +149,24 @@ Code generation only depends on the target platform, which `BURN_PLATFORM` selec
 `macos-x86_64`, `linux-aarch64`, `macos-aarch64`). Linking needs a runtime library and a linker for that platform:
 `BURN_RUNTIME_DIR` and `BURN_CC`. See [cross-compiling](../tooling/cross-compiling.mdx).
 
+## Windows
+
+Windows executables are PE/COFF files made by mingw-w64. Burn functions call each other and the Burn runtime with the
+same convention as on Linux; only code that crosses into Windows uses the Win64 convention:
+
+- calls to C and Win32 functions put the first four arguments in `rcx`, `rdx`, `r8` and `r9` (floats in
+  `xmm0`–`xmm3`) and the rest above 32 bytes of shadow space;
+- `main` takes `argc` and `argv` from `rcx` and `rdx` and keeps `rdi` and `rsi`, which Windows callers expect;
+- every function the runtime exports has a `_w64` entry that moves the Win64 arguments into place, which the
+  runtime hands to Windows for thread starts and exception handlers.
+
+The runtime's `lib/rt/win.bn` provides what Windows lacks or lays out differently (`uname`, `stat`, `readdir`,
+`localtime_r`, `realpath`, `mmap` for the JIT, ...) in the layout the rest of the runtime reads; `@Extern(...,
+windows: "...")` points the declarations at them. Programs run with `CreateProcessA`, sockets go through Winsock,
+and standard output and files are binary, so `\n` stays `\n`.
+
 ## Stack overflow
 
 The runtime catches a stack overflow with a signal handler running on its own small stack and prints
 `runtime error: stack overflow (recursion is too deep)` before exiting with `1`, on Linux and macOS, x86-64 and
-arm64.
+arm64. On Windows a vectored exception handler moves the thread to a stack of its own and prints the same message.
