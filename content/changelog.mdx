@@ -9,6 +9,10 @@ order: 3
 Every release of Burn, newest first. Versions are explained in [Burn standards](./standards.mdx#yearly-versions);
 releases can be downloaded from [GitHub](https://github.com/burnlang/burn/releases) or installed with burnup.
 
+## Unreleased
+
+- The compiler rejects memory hazards that used to compile, each with a suggested fix ([memory](./language/memory.mdx#what-the-compiler-rejects)): adding to or removing from an array or map inside a `for` loop over it, using an array, map or object while an `async fun` it was given to may still be changing it, and async functions that change globals or read global arrays, maps and objects.
+
 ## 26.1.0-experimental-9
 
 Your editor explains the language: hover over a keyword or a built-in type to see what it does, and go to its

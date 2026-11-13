@@ -40,6 +40,20 @@ The compiler keeps the bookkeeping cheap:
 - `s += piece` grows the string in place when `s` is its only owner, so building text in a loop takes linear time.
 - Async tasks get their own share of the values passed to them, so tasks can safely use the same objects.
 
+## What the compiler rejects
+
+Freeing is automatic, so the memory errors left are the ones where two pieces of code change the same value at the
+wrong time. The compiler reports each of them, with the fix:
+
+| Mistake | Fix |
+| --- | --- |
+| Using a variable after `destroy x()` | assign it a new object first |
+| Adding to or removing from an array or map inside a `for` loop over it | loop over `copy(xs)` or `keys(m)` |
+| Using an array, map or object while an `async fun` it was passed to may still run | `await` first, or pass `copy(xs)` |
+| Changing a global, or reading a global array, map or object, inside an `async fun` | pass it as an argument and return the result |
+
+See [loops](./control-flow.mdx#for--in) and [sharing data between tasks](./async.mdx#sharing-data).
+
 ## Cycles
 
 Objects that point at each other, like a parent node and its children or two structs that refer to each other, are
