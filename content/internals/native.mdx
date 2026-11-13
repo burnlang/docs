@@ -8,7 +8,8 @@ order: 53
 
 `burn build` (and `burnc`) turns a program into a standalone executable for the machine: x86-64 or 64-bit ARM, on
 Linux or macOS. It starts from the same IR as bvm, after the [ownership pass](./memory.mdx), and generates assembly
-text that the system's C compiler assembles and links.
+text that the system's C compiler assembles and links. A large program's assembly is cut into pieces of about 150000
+lines at function boundaries, which are assembled in parallel on every core and linked together.
 
 ```text
 IR ──▶ compiler/src/native/x86.bn or arm64.bn ──▶ app.s ──▶ cc ──▶ app
@@ -34,11 +35,7 @@ bf_1:
     mov rbp, rsp
     sub rsp, 32
     mov rax, qword ptr [rbp + 24]     ; a
-    mov qword ptr [rbp - 8], rax
-    mov rax, qword ptr [rbp + 16]     ; b
-    mov qword ptr [rbp - 16], rax
-    mov rax, qword ptr [rbp - 8]
-    mov rcx, qword ptr [rbp - 16]
+    mov rcx, qword ptr [rbp + 16]     ; b
     add rax, rcx
     jo .L9                            ; integer overflow?
     mov qword ptr [rbp - 24], rax
@@ -57,8 +54,16 @@ bf_1:
 - **Functions** are labeled by number (`bf_1`); `--no-strip` keeps these labels in the symbol table.
 - **Arguments** are pushed on the stack by the caller, first argument first, so the last one is closest to the
   callee's frame; the caller removes them after the call. Results come back in `rax` (`x0` on ARM).
-- **Locals** live in the stack frame at fixed offsets. Expressions are evaluated into `rax`/`x0`, with intermediate
-  values pushed on the stack.
+- **Parameters** stay where the caller pushed them; the function reads and writes them there.
+- **Locals** live in the stack frame at fixed offsets, except the hottest locals used in loops: up to four live in
+  `rbx`, `r13`, `r14` and `r15` (eight in `x19`–`x26` on ARM), which the function saves on entry and restores when
+  it returns. Expressions are evaluated into `rax`/`x0`, with intermediate values pushed on the stack; constants
+  that fit are used as immediates, and `x += 1` on a register local is a single instruction.
+- **Small functions** whose body is one expression over their parameters (getters, wrappers, the runtime's memory
+  helpers) are inlined at their call sites before code generation (`lower/inline.bn`).
+- **Division by a constant** uses shifts for powers of two and a multiplication by a precomputed magic number
+  otherwise, instead of the slow divide instruction.
+- **`push`** stores the element in place while the array has room and only calls the runtime to grow it.
 - **Checks** are inline: overflow is a `jo` (on ARM, the flags after `adds`/`subs`, or a widening multiply),
   bounds checks compare with the length stored in the array, null checks test for zero. The error path is placed
   after the function and calls the runtime with the location id, so the fast path has no extra jumps.
@@ -66,7 +71,7 @@ bf_1:
   convention, with the stack aligned to 16 bytes.
 - **Reference counting** is inlined: a retain or release is a null test, a static test, a test of the
   multi-threaded flag and an increment or decrement of the count at offset 12. Only freeing and the cycle check call
-  into the runtime ([memory management](./memory.mdx#retain-and-release-at-runtime)).
+  into the runtime, through one shared stub per program ([memory management](./memory.mdx#retain-and-release-at-runtime)).
 - **Fields and array elements** are read with one instruction after the checks, at the offsets described in
   [values in memory](./values.mdx).
 - **Interface calls** load the object's type id, index the dispatch table and call through it.
