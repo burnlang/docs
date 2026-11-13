@@ -40,8 +40,11 @@ unsafe {
   [`std/memory`](../stdlib/memory.mdx).
 - **Results.** A sized integer comes back the way C returns it and is widened like the type says: an `Int32` result
   of `-1` is `-1`, a `UInt8` result keeps only its lowest 8 bits.
-- **Registers.** At most 6 integer and 8 float parameters, which is what C passes in registers on every platform
-  Burn supports. Variadic functions such as `printf` are not supported.
+- **Parameters.** Any number of integer parameters (the ones after the registers go on the stack) and at most 8 float
+  parameters. Variadic functions such as `printf` are not supported.
+- **Names per system.** When the symbol differs on macOS or Windows, name it there too:
+  `@Extern("__errno_location", macos: "__error", windows: "_errno")`. On Windows the call uses the Win64 calling
+  convention.
 - **Return type.** It must be written, `: void` when there is none.
 - **Unsafe.** Nothing checks what a C function does with memory, so calling one, or using it as a value, needs
   [unsafe code](./unsafe.mdx).

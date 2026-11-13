@@ -17,8 +17,9 @@ machine code itself, then hands it to a C toolchain to assemble and link it with
 | `linux-aarch64` | 64-bit ARM | Raspberry Pi 4 and 5 with a 64-bit OS, ARM servers such as AWS Graviton |
 | `macos-x86_64` | x86-64 | Macs with an Intel processor |
 | `macos-aarch64` | 64-bit ARM | Macs with Apple silicon: M1, M2, M3, M4 and later |
+| `windows-x86_64` | x86-64 | Windows 10 and 11 PCs (executables are `.exe`) |
 
-On any other system (Windows, 32-bit ARM, RISC-V), use `burn run`, bytecode (`--target bvm`), archives
+On any other system (32-bit ARM, RISC-V), use `burn run`, bytecode (`--target bvm`), archives
 (`--target bar`) or JavaScript (`--target js`), which run everywhere bvm or Node.js runs.
 
 ```sh
@@ -31,8 +32,9 @@ burn dump --asm app.bn       # the assembly it was built from
 ## What a native build needs
 
 - **A C toolchain.** `cc` assembles the generated `.s` file and links the executable. On macOS, install the Xcode
-  command line tools (`xcode-select --install`); on Linux, `gcc` or `clang` (`apt install build-essential`). Set
-  `BURN_CC` (or `CC`) to use another one.
+  command line tools (`xcode-select --install`); on Linux, `gcc` or `clang` (`apt install build-essential`); on
+  Windows, `gcc` from MinGW-w64 ([MSYS2](https://www.msys2.org/) or [w64devkit](https://github.com/skeeto/w64devkit)),
+  which `burn build` runs by default there. Set `BURN_CC` (or `CC`) to use another one.
 - **The runtime.** Every toolchain ships it in `share/burn/lib`: `libburn_runtime.a` (the runtime written in Burn),
   `libburn_launcher.a` (bvm written in Burn, for executables that run bytecode) and `native-libs.txt` (the system
   libraries the runtime needs).
@@ -73,8 +75,25 @@ burnc app.bn -o app-arm64
 ```
 
 `scripts/native-runtime.sh` is in the Burn repository; it compiles the runtime written in Burn (and bvm) with `burn`
-for the target you name (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu` or
-`x86_64-unknown-linux-gnu`) and assembles it with `BURN_CC`. `BURN_PLATFORM` alone is enough to look at the generated code:
+for the target you name (`aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`,
+`x86_64-unknown-linux-gnu` or `x86_64-w64-mingw32`) and assembles it with `BURN_CC`.
+
+Windows executables are built the same way with mingw-w64, from Linux or macOS:
+
+```sh
+sudo apt install mingw-w64
+
+TARGET=x86_64-w64-mingw32 BURN_CC=x86_64-w64-mingw32-gcc AR=x86_64-w64-mingw32-ar \
+  sh scripts/native-runtime.sh ~/burn-runtime-windows
+
+BURN_PLATFORM=windows-x86_64 \
+BURN_RUNTIME_DIR=~/burn-runtime-windows \
+BURN_CC=x86_64-w64-mingw32-gcc \
+burnc app.bn -o app       # app.exe
+```
+
+`scripts/package-windows.sh` builds the whole toolchain for Windows this way: `burn.exe` and its other names,
+`burnfmt.cmd` and `share/burn`, the folder that `burn-windows-x86_64.zip` in each release contains. `BURN_PLATFORM` alone is enough to look at the generated code:
 
 ```sh
 BURN_PLATFORM=macos-aarch64 burn dump --asm app.bn
