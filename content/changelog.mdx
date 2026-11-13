@@ -11,6 +11,7 @@ releases can be downloaded from [GitHub](https://github.com/burnlang/burn/releas
 
 ## Unreleased
 
+- Generic methods and generic interfaces: `fun map<U>(f: fun(T): U): Box<U>` in a struct, static or not, and `def interface Shows<T>` implemented with `:: Shows<int>` or, in a generic struct, `:: Shows<T>` ([generics](./language/generics.mdx#generic-methods)).
 - Windows: `burn build` makes native Windows x86-64 executables, and the whole toolchain runs on Windows: `burn.exe`, `burni.exe`, `burnc.exe`, `burn-lsp.exe`, `bvm.exe` and `burnfmt.cmd`, with the JIT, async tasks, processes (`cmd /c` for `Process.shell`), HTTP and stack overflow reports. Releases include `burn-windows-x86_64.zip`, built from Linux with mingw-w64 and tested on Windows in CI ([installation](./tooling/installation.mdx#windows), [cross-compiling](./tooling/cross-compiling.mdx)).
 - `@Extern` takes a Windows name next to the macOS one (`windows: "_errno"`), and C functions can take more than 6 integer parameters ([calling C](./language/calling-c.mdx)).
 - Native code is much faster ([native executables](./internals/native.mdx#a-function)): the hottest locals in loops live in registers, parameters are no longer copied on every call, `push` stores in place, division by a constant uses a multiplication instead of the divide instruction, small constants are immediates, and small functions are inlined. A prime sieve runs 8× faster and pushing to an array 20× faster, on x86-64 and arm64.
