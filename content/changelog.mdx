@@ -11,6 +11,8 @@ releases can be downloaded from [GitHub](https://github.com/burnlang/burn/releas
 
 ## Unreleased
 
+- Native code is much faster ([native executables](./internals/native.mdx#a-function)): the hottest locals in loops live in registers, parameters are no longer copied on every call, `push` stores in place, division by a constant uses a multiplication instead of the divide instruction, small constants are immediates, and small functions are inlined. A prime sieve runs 8× faster and pushing to an array 20× faster, on x86-64 and arm64.
+- Builds are about twice as fast: large programs are assembled in parallel on every core, the generated assembly is a quarter smaller, and the runtime frees memory and collects cycles without allocating. The compiler builds itself in 6.3 s instead of 11.8 s, and the same runtime changes make every program that allocates a lot faster.
 - Local variables that only hold a parameter, another variable, or a field or element of one now borrow their value instead of counting a reference, when nothing can free it while they are used ([memory](./language/memory.mdx#what-the-compiler-does)). Loops over arrays of objects and strings and walks over linked structures no longer touch reference counts; the compiler's own code does 8.5% fewer of them and builds faster.
 - The compiler rejects memory hazards that used to compile, each with a suggested fix ([memory](./language/memory.mdx#what-the-compiler-rejects)): adding to or removing from an array or map inside a `for` loop over it, using an array, map or object while an `async fun` it was given to may still be changing it, and async functions that change globals or read global arrays, maps and objects.
 
