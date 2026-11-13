@@ -100,15 +100,26 @@ for name, age in ages {
 
 - A range's end is computed once, before the first round. A range whose end is not above its start runs zero times;
   there is no counting down with ranges, use a `while` or a three-part `for`.
-- An array loop reads the array's length before each round: elements pushed during the loop are visited, and the
-  loop ends early when elements are removed.
-- A map loop visits the keys the map had when the loop started, in the order they were first added. Keys added
-  during the loop are not visited, and removing a key that the loop has not reached yet is a runtime error when it
-  gets there.
+- The body cannot add to or remove from the array or map the loop goes over (`push`, `append`, `pop`, `insert`,
+  `remove`, `clear`); the compiler reports it. Loop over a copy instead, or collect the changes and make them after
+  the loop. Changing elements in place (`xs[i] = ...`, `m[k] = ...`) is fine.
+- A map loop visits the keys in the order they were first added.
 - String loops go by character (Unicode code point), not by byte.
 - The loop variables only exist inside the loop, and each round has its own, so
   [closures](./functions.mdx#closures) created in the loop keep their own value.
 - Parentheses are allowed here too: `for (i in 0..3) { ... }`.
+
+```burn
+var xs = [1, 2, 3]
+for x in copy(xs) {
+    xs.push(x * 10)
+}
+
+var seen = {"a": 1, "b": 2}
+for k in keys(seen) {
+    remove(seen, k)
+}
+```
 
 ## `break` and `continue`
 

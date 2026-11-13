@@ -83,10 +83,36 @@ prints `main ends` first, then `a` and `b` once the tasks wake up, and only then
 
 ## Sharing data
 
-Tasks share global variables and the objects passed to them. Memory management is safe across threads: reference
-counting switches to atomic operations while tasks run, so sharing objects never frees them too early. Changing the
-same array, map or object from several tasks at the same time is not synchronized, though; give each task its own data
-and combine the results after `await`:
+Memory management is safe across threads: reference counting switches to atomic operations while tasks run, so
+sharing objects never frees them too early. Changing the same array, map or object from two threads at once would
+race, so the compiler does not allow it:
+
+- An array, map or object passed to an `async fun` cannot be used again until the call is awaited, either directly
+  (`await fill(xs)`) or through the variable that holds its future. Pass `copy(xs)` to keep using `xs` meanwhile.
+- An `async fun` cannot assign to global variables, or read globals that hold an array, map or object (constants are
+  fine). Pass what it needs as arguments and return what it makes.
+
+```burn
+async fun fill(xs: [int]): int {
+    xs.push(len(xs))
+    return len(xs)
+}
+
+var xs = [1]
+var task = fill(xs)
+print(await task, len(xs))
+var other = fill(copy(xs))
+print(len(xs), await other)
+```
+
+Using `xs` between `fill(xs)` and `await task` is a compile error:
+
+```
+error: `xs` was given to the async call on line 7, which may still be changing it
+  = help: `await` the call before using `xs` again, or pass a copy: `copy(xs)`
+```
+
+Give each task its own data and combine the results after `await`:
 
 ```burn
 async fun countWords(text: string): int {
